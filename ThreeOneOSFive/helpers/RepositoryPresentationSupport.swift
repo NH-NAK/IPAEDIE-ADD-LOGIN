@@ -146,19 +146,49 @@ actor RepositoryImagePipeline {
 
         let session = session
         let task = Task<Data, Error> {
-            var request = URLRequest(url: url)
-            request.cachePolicy = .useProtocolCachePolicy
-            request.setValue("3105", forHTTPHeaderField: "User-Agent")
-            let (data, response) = try await session.data(for: request)
-            guard let response = response as? HTTPURLResponse,
-                  (200..<300).contains(response.statusCode),
-                  response.mimeType?.hasPrefix("image/") == true else {
-                throw RepositoryImagePipelineError.invalidResponse
+            var downloadError: Error?
+            
+            // 1. Try primary URL download
+            do {
+                var request = URLRequest(url: url)
+                request.cachePolicy = .useProtocolCachePolicy
+                request.setValue("3105", forHTTPHeaderField: "User-Agent")
+                let (data, response) = try await session.data(for: request)
+                if let response = response as? HTTPURLResponse,
+                   (200..<300).contains(response.statusCode),
+                   response.mimeType?.hasPrefix("image/") == true,
+                   data.count <= Self.maximumImageBytes {
+                    return data
+                }
+                downloadError = RepositoryImagePipelineError.invalidResponse
+            } catch {
+                downloadError = error
             }
-            guard data.count <= Self.maximumImageBytes else {
-                throw RepositoryImagePipelineError.imageTooLarge
+            
+            // 2. Try fallback URL download
+            let primaryStr = url.absoluteString
+            let fallbackStr = primaryStr.contains("server-key-3105.onrender.com")
+                ? primaryStr.replacingOccurrences(of: "server-key-3105.onrender.com", with: "server-key-3105-oiaa.onrender.com")
+                : primaryStr.replacingOccurrences(of: "server-key-3105-oiaa.onrender.com", with: "server-key-3105.onrender.com")
+                
+            if let fallbackURL = URL(string: fallbackStr) {
+                do {
+                    var request = URLRequest(url: fallbackURL)
+                    request.cachePolicy = .useProtocolCachePolicy
+                    request.setValue("3105", forHTTPHeaderField: "User-Agent")
+                    let (data, response) = try await session.data(for: request)
+                    if let response = response as? HTTPURLResponse,
+                       (200..<300).contains(response.statusCode),
+                       response.mimeType?.hasPrefix("image/") == true,
+                       data.count <= Self.maximumImageBytes {
+                        return data
+                    }
+                } catch {
+                    downloadError = error
+                }
             }
-            return data
+            
+            throw downloadError ?? RepositoryImagePipelineError.invalidResponse
         }
         dataInFlight[url] = task
 

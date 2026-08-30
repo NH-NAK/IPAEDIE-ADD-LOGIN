@@ -533,10 +533,44 @@ enum PackageRepositoryNetworkClient {
         _ package: RepositoryPackage,
         maximumBytes: Int?
     ) async throws -> URL {
-        let download = try await downloadFile(
-            from: package.downloadURL,
-            maximumBytes: maximumBytes
-        )
+        var downloadError: Error?
+        
+        // 1. Try primary download URL
+        do {
+            let download = try await downloadFile(
+                from: package.downloadURL,
+                maximumBytes: maximumBytes
+            )
+            return try verifyDownloadedFile(download, package: package)
+        } catch {
+            downloadError = error
+        }
+        
+        // 2. Try fallback download URL if primary failed
+        let primaryStr = package.downloadURL.absoluteString
+        let fallbackStr = primaryStr.contains("server-key-3105.onrender.com")
+            ? primaryStr.replacingOccurrences(of: "server-key-3105.onrender.com", with: "server-key-3105-oiaa.onrender.com")
+            : primaryStr.replacingOccurrences(of: "server-key-3105-oiaa.onrender.com", with: "server-key-3105.onrender.com")
+            
+        if let fallbackURL = URL(string: fallbackStr) {
+            do {
+                let download = try await downloadFile(
+                    from: fallbackURL,
+                    maximumBytes: maximumBytes
+                )
+                return try verifyDownloadedFile(download, package: package)
+            } catch {
+                downloadError = error
+            }
+        }
+        
+        throw downloadError ?? PackageRepositoryError.sourceUnavailable
+    }
+    
+    private static func verifyDownloadedFile(
+        _ download: (fileURL: URL, finalURL: URL),
+        package: RepositoryPackage
+    ) throws -> URL {
         do {
             let values = try download.fileURL.resourceValues(
                 forKeys: [.fileSizeKey, .isRegularFileKey]
