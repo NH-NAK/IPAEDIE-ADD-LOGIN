@@ -2,10 +2,11 @@ import Foundation
 
 enum AppSection: Int, CaseIterable, Identifiable {
     case home
+    case new
+    case sources
+    case installed
     case files
-    case patches
-    case cleaner
-    case wallpapers
+    case search
 
     var id: Int { rawValue }
 }

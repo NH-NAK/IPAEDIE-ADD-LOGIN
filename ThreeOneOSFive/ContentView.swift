@@ -52,10 +52,10 @@ struct ContentView: View {
         .tint(AppTheme.accent)
         .imageScale(.small)
         .onChange(of: patchDraftCoordinator.request?.id) { requestID in
-            if requestID != nil { tabNavigation.select(AppSection.patches.rawValue) }
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
         }
         .onChange(of: patchDraftCoordinator.importRequest?.id) { requestID in
-            if requestID != nil { tabNavigation.select(AppSection.patches.rawValue) }
+            if requestID != nil { tabNavigation.select(AppSection.installed.rawValue) }
         }
         .onChange(of: developerModeEnabled) { _ in
             tabNavigation.reconcileSelection(with: featureVisibility)
@@ -73,45 +73,14 @@ struct ContentView: View {
         TabView(selection: tabSelection) {
             ForEach(featureVisibility.visibleSections) { section in
                 sectionContent(section)
-                    .toolbar(.hidden, for: .tabBar)
+                    .tabItem {
+                        CompactTabLabel(
+                            title: language.text(section.titleKey),
+                            systemImage: section.systemImage
+                        )
+                    }
                     .tag(section.rawValue)
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                Divider()
-                HStack(spacing: 0) {
-                    ForEach(featureVisibility.visibleSections) { section in
-                        Spacer()
-                        Button {
-                            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
-                                tabNavigation.select(section.rawValue)
-                            }
-                        } label: {
-                            VStack(spacing: 4) {
-                                Image(systemName: section.systemImage)
-                                    .font(.system(size: 20, weight: .medium))
-                                    .frame(height: 24)
-                                Text(language.text(section.titleKey))
-                                    .font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundStyle(tabNavigation.selectedTab == section.rawValue ? AppTheme.accent : Color.primary.opacity(0.8))
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .background(
-                                tabNavigation.selectedTab == section.rawValue
-                                    ? Color(uiColor: .secondarySystemBackground)
-                                    : Color.clear,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        Spacer()
-                    }
-                }
-                .padding(.vertical, 6)
-            }
-            .background(.ultraThinMaterial)
         }
     }
 
@@ -157,21 +126,32 @@ struct ContentView: View {
                 onOpenSettings: openSettings,
                 onOpenLogs: openLogs
             )
+        case .new:
+            RepositoryNewView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .sources:
+            RepositorySourcesView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
+        case .installed:
+            PatchProjectsView(
+                onOpenSettings: openSettings,
+                onOpenLogs: openLogs
+            )
         case .files:
             AppDataBrowserView(
                 tabSession: filesTabSession,
                 onOpenSettings: openSettings,
                 onOpenLogs: openLogs
             )
-        case .patches:
-            PatchProjectsView(
+        case .search:
+            RepositorySearchView(
                 onOpenSettings: openSettings,
                 onOpenLogs: openLogs
             )
-        case .cleaner:
-            CleanerView()
-        case .wallpapers:
-            WallpaperLabView()
         }
     }
 
@@ -217,6 +197,7 @@ struct ContentView: View {
     private func openLogs() {
         showLogs = true
     }
+    
 }
 
 private struct CompactTabLabel: View {
@@ -242,20 +223,22 @@ private extension AppSection {
     var titleKey: String {
         switch self {
         case .home: return "tab.home"
+        case .new: return "tab.new"
+        case .sources: return "tab.sources"
+        case .installed: return "tab.installed"
         case .files: return "tab.files"
-        case .patches: return "tab.patches"
-        case .cleaner: return "tab.cleaner"
-        case .wallpapers: return "tab.wallpapers"
+        case .search: return "tab.search"
         }
     }
 
     var systemImage: String {
         switch self {
         case .home: return "house.fill"
+        case .new: return "clock.fill"
+        case .sources: return "shippingbox.fill"
+        case .installed: return "tray.full.fill"
         case .files: return "folder.fill"
-        case .patches: return "shippingbox.fill"
-        case .cleaner: return "sparkles"
-        case .wallpapers: return "photo.fill"
+        case .search: return "magnifyingglass"
         }
     }
 }

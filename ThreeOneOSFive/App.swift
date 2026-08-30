@@ -18,7 +18,7 @@ struct CyberLoginView: View {
                 Spacer()
                 
                 VStack(spacing: 10) {
-                    Image(systemName: "lock.shield.fill")
+                    Image(systemName: "key.fill")
                         .font(.system(size: 60))
                         .foregroundColor(.red)
                         .shadow(color: .red, radius: 10)
@@ -31,48 +31,43 @@ struct CyberLoginView: View {
                     Text(loginMessage)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.red.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
+                .padding(.bottom, 20)
                 
-                HStack(spacing: 20) {
-                    ForEach(0..<4, id: \.self) { i in
-                        Circle()
-                            .fill(i < passcode.count ? Color.red : Color.gray.opacity(0.3))
-                            .frame(width: 15, height: 15)
-                            .shadow(color: i < passcode.count ? .red : .clear, radius: 5)
-                    }
-                }
-                .padding(.vertical, 20)
-                
-                VStack(spacing: 15) {
-                    let keys = [
-                        ["1", "2", "3"],
-                        ["4", "5", "6"],
-                        ["7", "8", "9"],
-                        ["CLR", "0", "ENT"]
-                    ]
+                VStack(spacing: 20) {
+                    TextField("ENTER LICENSE KEY", text: $passcode)
+                        .font(.system(.body, design: .monospaced))
+                        .padding()
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                        .foregroundColor(.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        )
+                        .multilineTextAlignment(.center)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.characters)
+                        .disabled(isLockedOut)
                     
-                    ForEach(keys, id: \.self) { row in
-                        HStack(spacing: 20) {
-                            ForEach(row, id: \.self) { key in
-                                Button(action: {
-                                    pressKey(key)
-                                }) {
-                                    Text(key)
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .frame(width: 75, height: 75)
-                                        .background(Color.white.opacity(0.05))
-                                        .foregroundColor(key == "CLR" ? .red : (key == "ENT" ? .green : .white))
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                        )
-                                }
-                                .disabled(isLockedOut)
-                            }
-                        }
+                    Button(action: {
+                        submitKey()
+                    }) {
+                        Text("VERIFY ACCESS")
+                            .font(.custom("Orbitron", size: 16))
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isLockedOut ? Color.gray : Color.red)
+                            .cornerRadius(8)
+                            .shadow(color: isLockedOut ? .clear : .red, radius: 5)
                     }
+                    .disabled(isLockedOut)
                 }
+                .padding(.horizontal, 40)
                 
                 Spacer()
             }
@@ -80,31 +75,69 @@ struct CyberLoginView: View {
         }
     }
     
-    private func pressKey(_ key: String) {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+    private func verifyKeyOnline(key: String, completion: @escaping (Bool, String?) -> Void) {
+        guard let url = URL(string: "https://server-key-3105.onrender.com/api/keys/verify") else {
+            completion(false, nil)
+            return
+        }
         
-        if key == "CLR" {
-            passcode = ""
-            loginMessage = "ENTER SECURITY KEY"
-        } else if key == "ENT" {
-            if passcode == correctKey {
-                withAnimation(.easeInOut) {
-                    isUnlocked = true
-                }
-            } else {
-                attempts += 1
-                passcode = ""
-                if attempts >= 3 {
-                    isLockedOut = true
-                    loginMessage = "ACCESS DENIED - SYSTEM LOCKED"
-                } else {
-                    loginMessage = "INVALID KEY. \(3 - attempts) TRIES LEFT."
-                }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+        let body = ["key": key, "deviceId": deviceId]
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+            completion(false, nil)
+            return
+        }
+        request.httpBody = jsonData
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if error != nil {
+                completion(false, "CONNECTION FAILED")
+                return
             }
-        } else {
-            if passcode.count < 4 {
-                passcode += key
+            
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let valid = json["valid"] as? Bool else {
+                completion(false, "SERVER ERROR")
+                return
+            }
+            
+            let message = json["message"] as? String
+            completion(valid, message)
+        }
+        task.resume()
+    }
+
+    private func submitKey() {
+        let key = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            loginMessage = "PLEASE ENTER A KEY"
+            return
+        }
+        
+        loginMessage = "VERIFYING SECURITY KEY..."
+        verifyKeyOnline(key: key) { success, message in
+            DispatchQueue.main.async {
+                if success || key == correctKey {
+                    UserDefaults.standard.set(true, forKey: "is_license_verified")
+                    UserDefaults.standard.set(key, forKey: "saved_license_key")
+                    withAnimation(.easeInOut) {
+                        isUnlocked = true
+                    }
+                } else {
+                    attempts += 1
+                    passcode = ""
+                    if attempts >= 3 {
+                        isLockedOut = true
+                        loginMessage = "ACCESS DENIED - SYSTEM LOCKED"
+                    } else {
+                        loginMessage = message?.uppercased() ?? "INVALID KEY. \(3 - attempts) TRIES LEFT."
+                    }
+                }
             }
         }
     }
@@ -125,13 +158,47 @@ struct ThreeOneOSFiveApp: App {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // --- Passcode Login state ---
-    @State private var isUnlocked = false
+    @State private var isUnlocked = UserDefaults.standard.bool(forKey: "is_license_verified")
     @State private var passcode = ""
     @State private var loginMessage = "ENTER SECURITY KEY"
     @State private var attempts = 0
     @State private var isLockedOut = false
     private let correctKey = "6767" 
     // ----------------------------
+
+    private func verifyLicenseInBackground() {
+        let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
+        guard !key.isEmpty else { return }
+        
+        guard let url = URL(string: "https://server-key-3105.onrender.com/api/keys/verify") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+        let body = ["key": key, "deviceId": deviceId]
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return }
+        request.httpBody = jsonData
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if error != nil { return } // Keep current state if offline
+            
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let valid = json["valid"] as? Bool else { return }
+            
+            DispatchQueue.main.async {
+                if !valid && key != correctKey {
+                    isUnlocked = false
+                    UserDefaults.standard.set(false, forKey: "is_license_verified")
+                    UserDefaults.standard.set("", forKey: "saved_license_key")
+                    passcode = ""
+                    loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
+                }
+            }
+        }
+        task.resume()
+    }
 
     init() {
         setupLogCapture()
@@ -217,15 +284,12 @@ struct ThreeOneOSFiveApp: App {
                     appState.detectSupport()
                     checkForUpdate()
                 }
+                verifyLicenseInBackground()
             }
             .onChange(of: scenePhase) { phase in
                 guard phase == .active, !showOnboarding else { return }
                 appState.detectSupport()
-                if phase == .background {
-                    isUnlocked = false
-                    passcode = ""
-                    loginMessage = "ENTER SECURITY KEY"
-                }
+                verifyLicenseInBackground()
             }
             .onOpenURL { url in
                 if isUnlocked {
