@@ -291,6 +291,22 @@ struct PatchProjectsView: View {
                     )
                 }
             }
+            .navigationDestination(for: FileBrowserDestination.self) { destination in
+                if destination.startPath == destination.containerPath {
+                    FileBrowserView(
+                        containerPath: destination.containerPath,
+                        title: destination.title,
+                        bundleID: destination.bundleID
+                    )
+                } else {
+                    FileBrowserView(
+                        containerPath: destination.containerPath,
+                        startPath: destination.startPath,
+                        title: destination.title,
+                        bundleID: destination.bundleID
+                    )
+                }
+            }
             .onChange(of: draftCoordinator.importRequest?.id) { _ in
                 consumeExternalImport()
             }
