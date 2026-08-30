@@ -231,7 +231,8 @@ struct OnboardingView: View {
                         Spacer()
                         Text(language.text("onboarding.beta")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
-                    ForEach(ExploitSupportPolicy.verifiedIOS27Builds, id: \.build) { v in
+                    ForEach(0..<ExploitSupportPolicy.verifiedIOS27Builds.count, id: \.self) { index in
+                        let v = ExploitSupportPolicy.verifiedIOS27Builds[index]
                         let betaLabel = language.text("onboarding.developer_beta", "\(v.beta)")
                             + (v.publicBeta.map {
                                 " · " + language.text("onboarding.public_beta", "\($0)")

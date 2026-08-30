@@ -89,10 +89,11 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("iOS 27.0")
                             .font(.body)
-                        ForEach(ExploitSupportPolicy.verifiedIOS27Builds, id: \.build) { version in
+                        ForEach(0..<ExploitSupportPolicy.verifiedIOS27Builds.count, id: \.self) { index in
+                            let version = ExploitSupportPolicy.verifiedIOS27Builds[index]
                             Text(versionLabel(version))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .padding(.vertical, 2)
