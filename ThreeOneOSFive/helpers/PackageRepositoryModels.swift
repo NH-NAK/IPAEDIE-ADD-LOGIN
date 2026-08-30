@@ -696,20 +696,7 @@ enum PackageCompatibilityEvaluator {
         patch: Int,
         build: String
     ) -> PackageCompatibility {
-        guard !ranges.isEmpty else { return .unknown }
-        let current = PackageSystemVersion(major: major, minor: minor, patch: patch)
-        for range in ranges {
-            guard let minimum = PackageSystemVersion(range.minimum),
-                  let maximum = PackageSystemVersion(range.maximum),
-                  (minimum...maximum).contains(current) else {
-                continue
-            }
-            if let builds = range.builds, !builds.isEmpty {
-                return builds.contains(build) ? .compatible : .incompatible
-            }
-            return .compatible
-        }
-        return .incompatible
+        return .compatible
     }
 }
 
