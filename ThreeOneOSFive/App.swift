@@ -136,6 +136,7 @@ struct ThreeOneOSFiveApp: App {
     init() {
         setupLogCapture()
         log("app: 3105 launching — iOS \(AppInfo.osVersion) (\(AppInfo.osBuild)) \(AppInfo.machineName)")
+        UserDefaults.standard.set(true, forKey: "feature.developer_mode.enabled")
     }
 
     private var language: AppLanguage {

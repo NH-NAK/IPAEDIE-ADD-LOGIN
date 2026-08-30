@@ -1,6 +1,36 @@
 {
   "images" : [
     {
+      "filename" : "HackerIcon.png",
+      "idiom" : "iphone",
+      "scale" : "1x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "HackerIcon@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "HackerIcon@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "HackerIcon~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "1x",
+      "size" : "76x76"
+    },
+    {
+      "filename" : "HackerIcon@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "76x76"
+    },
+    {
       "filename" : "AppIcon-1024.png",
       "idiom" : "universal",
       "platform" : "ios",
