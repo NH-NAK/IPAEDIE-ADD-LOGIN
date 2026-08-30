@@ -18,18 +18,14 @@ jobs:
         sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
         xcodebuild -version
 
-    - name: Clean Build Workspace
+    - name: Build Target
       run: |
-        xcodebuild clean -project ThreeOneOSFive.xcodeproj -scheme ThreeOneOSFive -configuration Release
-
-    - name: Archive Project
-      run: |
-        xcodebuild archive \
+        xcodebuild build \
           -project ThreeOneOSFive.xcodeproj \
-          -scheme ThreeOneOSFive \
+          -target 3105 \
           -configuration Release \
-          -archivePath build/ThreeOneOSFive.xcarchive \
           -sdk iphoneos \
+          SYMROOT=build \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGN_IDENTITY=""
@@ -37,9 +33,7 @@ jobs:
     - name: Package as IPA
       run: |
         mkdir -p Payload
-        cp -r build/ThreeOneOSFive.xcarchive/Products/Applications/ThreeOneOSFive.app Payload/3105.app
-        # Re-apply our patched color theme assets if any, and make sure name is correct
-        mv Payload/ThreeOneOSFive.app Payload/3105.app || true
+        cp -r build/Release-iphoneos/3105.app Payload/3105.app
         zip -r 3105_patched.ipa Payload
 
     - name: Upload Patched IPA
