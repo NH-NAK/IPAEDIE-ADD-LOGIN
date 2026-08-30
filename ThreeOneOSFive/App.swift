@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 // Custom Passcode Login view
 struct CyberLoginView: View {
@@ -76,40 +77,60 @@ struct CyberLoginView: View {
     }
     
     private func verifyKeyOnline(key: String, completion: @escaping (Bool, String?) -> Void) {
-        guard let url = URL(string: "https://server-key-3105.onrender.com/api/keys/verify") else {
-            completion(false, nil)
-            return
-        }
+        let urls = [
+            "https://server-key-3105.onrender.com/api/keys/verify",
+            "https://server-key-3105-oiaa.onrender.com/api/keys/verify"
+        ]
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-        let body = ["key": key, "deviceId": deviceId]
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
-            completion(false, nil)
-            return
-        }
-        request.httpBody = jsonData
-        
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            if error != nil {
+        func tryUrl(index: Int) {
+            guard index < urls.count else {
                 completion(false, "CONNECTION FAILED")
                 return
             }
-            
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let valid = json["valid"] as? Bool else {
-                completion(false, "SERVER ERROR")
+            guard let url = URL(string: urls[index]) else {
+                tryUrl(index: index + 1)
                 return
             }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            let message = json["message"] as? String
-            completion(valid, message)
+            let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+            let body = ["key": key, "deviceId": deviceId]
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+                tryUrl(index: index + 1)
+                return
+            }
+            request.httpBody = jsonData
+            
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if error != nil {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let valid = json["valid"] as? Bool else {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                let message = json["message"] as? String
+                if valid {
+                    completion(true, message)
+                } else {
+                    if index + 1 < urls.count {
+                        tryUrl(index: index + 1)
+                    } else {
+                        completion(false, message)
+                    }
+                }
+            }
+            task.resume()
         }
-        task.resume()
+        
+        tryUrl(index: 0)
     }
 
     private func submitKey() {
@@ -164,40 +185,72 @@ struct ThreeOneOSFiveApp: App {
     @State private var attempts = 0
     @State private var isLockedOut = false
     private let correctKey = "6767" 
+    private let licenseCheckTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     // ----------------------------
 
     private func verifyLicenseInBackground() {
         let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
         guard !key.isEmpty else { return }
         
-        guard let url = URL(string: "https://server-key-3105.onrender.com/api/keys/verify") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let urls = [
+            "https://server-key-3105.onrender.com/api/keys/verify",
+            "https://server-key-3105-oiaa.onrender.com/api/keys/verify"
+        ]
         
-        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-        let body = ["key": key, "deviceId": deviceId]
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return }
-        request.httpBody = jsonData
-        
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            if error != nil { return } // Keep current state if offline
+        func tryUrl(index: Int) {
+            guard index < urls.count else { return }
+            guard let url = URL(string: urls[index]) else {
+                tryUrl(index: index + 1)
+                return
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let valid = json["valid"] as? Bool else { return }
+            let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+            let body = ["key": key, "deviceId": deviceId]
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+                tryUrl(index: index + 1)
+                return
+            }
+            request.httpBody = jsonData
             
-            DispatchQueue.main.async {
-                if !valid && key != correctKey {
-                    isUnlocked = false
-                    UserDefaults.standard.set(false, forKey: "is_license_verified")
-                    UserDefaults.standard.set("", forKey: "saved_license_key")
-                    passcode = ""
-                    loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if error != nil {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let valid = json["valid"] as? Bool else {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                DispatchQueue.main.async {
+                    if valid {
+                        UserDefaults.standard.set(true, forKey: "is_license_verified")
+                        UserDefaults.standard.set(key, forKey: "saved_license_key")
+                    } else {
+                        if index + 1 < urls.count {
+                            tryUrl(index: index + 1)
+                        } else {
+                            if key != self.correctKey {
+                                self.isUnlocked = false
+                                UserDefaults.standard.set(false, forKey: "is_license_verified")
+                                UserDefaults.standard.set("", forKey: "saved_license_key")
+                                self.passcode = ""
+                                self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
+                            }
+                        }
+                    }
                 }
             }
+            task.resume()
         }
-        task.resume()
+        
+        tryUrl(index: 0)
     }
 
     init() {
@@ -294,6 +347,11 @@ struct ThreeOneOSFiveApp: App {
             .onOpenURL { url in
                 if isUnlocked {
                     patchDraftCoordinator.presentImport(url)
+                }
+            }
+            .onReceive(licenseCheckTimer) { _ in
+                if isUnlocked {
+                    verifyLicenseInBackground()
                 }
             }
         }

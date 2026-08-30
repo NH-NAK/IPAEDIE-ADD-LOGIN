@@ -34,8 +34,9 @@ final class PackageRepositoryStore: ObservableObject {
         } else {
             resolutionIndex = RepositoryPackageResolutionIndex()
         }
-        let defaultRepo = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
-        sources = [defaultRepo]
+        let defaultRepo1 = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
+        let defaultRepo2 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!)
+        sources = [defaultRepo1, defaultRepo2]
         persist()
         for source in sources {
             sourceStates[source.id] = .idle
@@ -94,9 +95,10 @@ final class PackageRepositoryStore: ObservableObject {
     @discardableResult
     func addSource(rawURL: String) -> Bool {
         do {
-            let allowedURL = "https://server-key-3105.onrender.com/repo.json"
+            let allowedURL1 = "https://server-key-3105.onrender.com/repo.json"
+            let allowedURL2 = "https://server-key-3105-oiaa.onrender.com/repo.json"
             let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.caseInsensitiveCompare(allowedURL) == .orderedSame else {
+            guard trimmed.caseInsensitiveCompare(allowedURL1) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL2) == .orderedSame else {
                 throw PackageRepositoryError.insecureURL
             }
             guard !sources.contains(where: {
@@ -124,8 +126,9 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func removeSource(_ source: RepositorySource) {
-        let allowedURL = "https://server-key-3105.onrender.com/repo.json"
-        guard source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL) != .orderedSame else {
+        let allowedURL1 = "https://server-key-3105.onrender.com/repo.json"
+        let allowedURL2 = "https://server-key-3105-oiaa.onrender.com/repo.json"
+        guard source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL1) != .orderedSame && source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL2) != .orderedSame else {
             return
         }
         sources.removeAll { $0.id == source.id }
@@ -487,7 +490,10 @@ private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskD
 
 enum PackageRepositoryNetworkClient {
     static func loadSourceCatalog(from catalogURL: URL) async throws -> [URL] {
-        return [URL(string: "https://server-key-3105.onrender.com/repo.json")!]
+        return [
+            URL(string: "https://server-key-3105.onrender.com/repo.json")!,
+            URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!
+        ]
     }
 
     static func loadRepository(from sourceURL: URL) async throws -> PackageRepository {
