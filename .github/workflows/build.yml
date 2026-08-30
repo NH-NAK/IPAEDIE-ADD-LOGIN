@@ -1,0 +1,49 @@
+name: Build 3105 iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode Version
+      run: |
+        sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+        xcodebuild -version
+
+    - name: Clean Build Workspace
+      run: |
+        xcodebuild clean -project ThreeOneOSFive.xcodeproj -scheme ThreeOneOSFive -configuration Release
+
+    - name: Archive Project
+      run: |
+        xcodebuild archive \
+          -project ThreeOneOSFive.xcodeproj \
+          -scheme ThreeOneOSFive \
+          -configuration Release \
+          -archivePath build/ThreeOneOSFive.xcarchive \
+          -sdk iphoneos \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY=""
+
+    - name: Package as IPA
+      run: |
+        mkdir -p Payload
+        cp -r build/ThreeOneOSFive.xcarchive/Products/Applications/ThreeOneOSFive.app Payload/3105.app
+        # Re-apply our patched color theme assets if any, and make sure name is correct
+        mv Payload/ThreeOneOSFive.app Payload/3105.app || true
+        zip -r 3105_patched.ipa Payload
+
+    - name: Upload Patched IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: 3105-Patched-IPA
+        path: 3105_patched.ipa
