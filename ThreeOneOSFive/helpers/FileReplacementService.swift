@@ -3,12 +3,12 @@ import Darwin
 import UniformTypeIdentifiers
 
 enum ReplacementPickerPolicy {
-    static let allowedContentTypes: [UTType] = [.data]
+    static let allowedContentTypes: [UTType] = [.data, .folder]
     static let copiesSelectedDocument = true
     static let presentationDelay: TimeInterval = 0.35
 
     static func accepts(_ type: UTType) -> Bool {
-        type.conforms(to: .data) && !type.conforms(to: .folder)
+        type.conforms(to: .data) || type.conforms(to: .folder)
     }
 }
 

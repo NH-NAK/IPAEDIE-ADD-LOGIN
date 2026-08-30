@@ -417,8 +417,32 @@ enum FileManagerService {
         guard sourceValues.isSymbolicLink != true else {
             throw FileManagerOperationError.symbolicLinkUnsupported
         }
-        guard sourceValues.isDirectory != true else {
-            throw FileManagerOperationError.sourceIsDirectory
+        if sourceValues.isDirectory == true {
+            let destinationURL = try destinationURL(
+                named: sourceURL.lastPathComponent,
+                in: directoryURL,
+                fileManager: fileManager
+            )
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                guard replaceExisting else {
+                    throw FileManagerOperationError.itemAlreadyExists
+                }
+                do {
+                    try fileManager.removeItem(at: destinationURL)
+                } catch {
+                    throw FileManagerOperationError.cannotImport
+                }
+            }
+            do {
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                return FileImportResult(
+                    destinationURL: destinationURL,
+                    byteCount: 0,
+                    disposition: replaceExisting ? .replaced : .imported
+                )
+            } catch {
+                throw FileManagerOperationError.cannotImport
+            }
         }
         let destinationURL = try destinationURL(
             named: sourceURL.lastPathComponent,
