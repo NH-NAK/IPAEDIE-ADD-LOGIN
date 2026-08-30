@@ -232,25 +232,8 @@ struct OnboardingView: View {
                         Text(language.text("onboarding.beta")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     ForEach(0..<ExploitSupportPolicy.verifiedIOS27Builds.count, id: \.self) { index in
-                        let v = ExploitSupportPolicy.verifiedIOS27Builds[index]
-                        let betaLabel = language.text("onboarding.developer_beta", "\(v.beta)")
-                            + (v.publicBeta.map {
-                                " · " + language.text("onboarding.public_beta", "\($0)")
-                            } ?? "")
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 12) {
-                                Text(betaLabel)
-                                Spacer()
-                                Text(v.build)
-                                    .font(.caption.monospaced().weight(.medium))
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(betaLabel)
-                                Text(v.build)
-                                    .font(.caption.monospaced().weight(.medium))
-                            }
-                        }
-                        .font(.caption.weight(.medium))
+                        IOS27BuildRow(index: index, language: language)
+                    }     .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                         .padding(.leading, 24)
                     }
@@ -489,5 +472,32 @@ enum OnboardingStore {
     static func markCompleted() {
         UserDefaults.standard.set(currentVersion, forKey: completedVersionKey)
         UserDefaults.standard.set(currentFingerprint, forKey: completedFingerprintKey)
+    }
+}
+
+struct IOS27BuildRow: View {
+    let index: Int
+    let language: AppLanguage
+    
+    var body: some View {
+        let v = ExploitSupportPolicy.verifiedIOS27Builds[index]
+        let betaLabel = language.text("onboarding.developer_beta", "\(v.beta)")
+            + (v.publicBeta.map {
+                " · " + language.text("onboarding.public_beta", "\($0)")
+            } ?? "")
+        
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                Text(betaLabel)
+                Spacer()
+                Text(v.build)
+                    .font(.caption.monospaced().weight(.medium))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(betaLabel)
+                Text(v.build)
+                    .font(.caption.monospaced().weight(.medium))
+            }
+        }
     }
 }

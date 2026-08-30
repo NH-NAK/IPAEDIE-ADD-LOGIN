@@ -90,8 +90,7 @@ struct SettingsView: View {
                         Text("iOS 27.0")
                             .font(.body)
                         ForEach(0..<ExploitSupportPolicy.verifiedIOS27Builds.count, id: \.self) { index in
-                            let version = ExploitSupportPolicy.verifiedIOS27Builds[index]
-                            Text(versionLabel(version))
+                            Text(versionLabel(ExploitSupportPolicy.verifiedIOS27Builds[index]))
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
