@@ -34,12 +34,9 @@ final class PackageRepositoryStore: ObservableObject {
         } else {
             resolutionIndex = RepositoryPackageResolutionIndex()
         }
-        if let data = defaults.data(forKey: Self.storageKey),
-           let decoded = try? JSONDecoder().decode([RepositorySource].self, from: data) {
-            sources = decoded
-        } else {
-            sources = []
-        }
+        let defaultRepo = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
+        sources = [defaultRepo]
+        persist()
         for source in sources {
             sourceStates[source.id] = .idle
         }
@@ -97,17 +94,20 @@ final class PackageRepositoryStore: ObservableObject {
     @discardableResult
     func addSource(rawURL: String) -> Bool {
         do {
+            let allowedURL = "https://server-key-3105.onrender.com/repo.json"
             let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.caseInsensitiveCompare(allowedURL) == .orderedSame else {
+                throw PackageRepositoryError.insecureURL
+            }
+            guard !sources.contains(where: {
+                $0.manifestURL.absoluteString.caseInsensitiveCompare(trimmed) == .orderedSame
+            }) else {
+                throw PackageRepositoryError.sourceAlreadyExists
+            }
             guard let candidate = URL(string: trimmed) else {
                 throw PackageRepositoryError.insecureURL
             }
             let url = try PackageRepositoryURLPolicy.validate(candidate)
-            guard !sources.contains(where: {
-                $0.manifestURL.absoluteString.caseInsensitiveCompare(url.absoluteString)
-                    == .orderedSame
-            }) else {
-                throw PackageRepositoryError.sourceAlreadyExists
-            }
             let source = RepositorySource(manifestURL: url)
             sources.append(source)
             sourceStates[source.id] = .idle
@@ -124,6 +124,10 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func removeSource(_ source: RepositorySource) {
+        let allowedURL = "https://server-key-3105.onrender.com/repo.json"
+        guard source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL) != .orderedSame else {
+            return
+        }
         sources.removeAll { $0.id == source.id }
         repositories[source.id] = nil
         sourceStates[source.id] = nil
@@ -163,38 +167,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     private func synchronizeDefaultSources() async {
-        catalogSyncOperations += 1
-        defer { catalogSyncOperations -= 1 }
-        do {
-            let catalogURLs = try await PackageRepositoryNetworkClient
-                .loadSourceCatalog(from: PackageRepositoryDefaults.catalogURL)
-            let existingCount = sources.count
-            let merged = RepositorySourceMergePolicy.merge(
-                existing: sources,
-                catalogURLs: catalogURLs
-            )
-            guard merged.count > existingCount else {
-                log(
-                    "repository: default catalog synced " +
-                    "sources=\(catalogURLs.count) added=0"
-                )
-                return
-            }
-
-            sources = merged
-            for source in sources.dropFirst(existingCount) {
-                sourceStates[source.id] = .idle
-            }
-            persist()
-            log(
-                "repository: default catalog synced " +
-                "sources=\(catalogURLs.count) added=\(merged.count - existingCount)"
-            )
-        } catch let error as PackageRepositoryError {
-            log("repository: default catalog unavailable \(error)")
-        } catch {
-            log("repository: default catalog unavailable")
-        }
+        // Disable external default sources sync to lock down the repository
     }
 
     func refresh(_ source: RepositorySource) {
@@ -514,17 +487,7 @@ private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskD
 
 enum PackageRepositoryNetworkClient {
     static func loadSourceCatalog(from catalogURL: URL) async throws -> [URL] {
-        let trustedURL = try PackageRepositoryURLPolicy.validate(catalogURL)
-        let download = try await downloadFile(
-            from: trustedURL,
-            maximumBytes: PackageRepositoryLimits.maximumCatalogBytes
-        )
-        defer { try? FileManager.default.removeItem(at: download.fileURL) }
-        let data = try Data(contentsOf: download.fileURL, options: .mappedIfSafe)
-        return try PackageRepositoryCatalogValidator.decode(
-            data,
-            catalogURL: download.finalURL
-        )
+        return [URL(string: "https://server-key-3105.onrender.com/repo.json")!]
     }
 
     static func loadRepository(from sourceURL: URL) async throws -> PackageRepository {
