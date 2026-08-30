@@ -233,9 +233,9 @@ struct OnboardingView: View {
                     }
                     ForEach(0..<ExploitSupportPolicy.verifiedIOS27Builds.count, id: \.self) { index in
                         IOS27BuildRow(index: index, language: language)
-                    }     .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 24)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 24)
                     }
                 }
                 .padding(12)
