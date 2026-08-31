@@ -10,6 +10,7 @@ struct CyberLoginView: View {
     @Binding var attempts: Int
     @Binding var isLockedOut: Bool
     let correctKey: String
+    let onForcedUpdateRequired: (String) -> Void
     
     var body: some View {
         ZStack {
@@ -118,7 +119,7 @@ struct CyberLoginView: View {
                 
                 if let updateRequired = json["updateRequired"] as? Bool, updateRequired {
                     let msg = json["message"] as? String ?? "App needs to update to new version"
-                    self.showForcedUpdateAlert(message: msg)
+                    onForcedUpdateRequired(msg)
                     return
                 }
                 
@@ -368,7 +369,8 @@ struct ThreeOneOSFiveApp: App {
                         isUnlocked: $isUnlocked,
                         attempts: $attempts,
                         isLockedOut: $isLockedOut,
-                        correctKey: correctKey
+                        correctKey: correctKey,
+                        onForcedUpdateRequired: showForcedUpdateAlert
                     )
                 }
             }
