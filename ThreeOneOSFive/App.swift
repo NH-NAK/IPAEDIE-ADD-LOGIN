@@ -79,8 +79,8 @@ struct CyberLoginView: View {
     
     private func verifyKeyOnline(key: String, completion: @escaping (Bool, String?) -> Void) {
         let urls = [
-            "https://server-key-3105.onrender.com/api/keys/verify",
-            "https://server-key-3105-oiaa.onrender.com/api/keys/verify"
+            "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
+            "https://server-key-3105.onrender.com/api/keys/verify"
         ]
         
         func tryUrl(index: Int) {
@@ -107,6 +107,11 @@ struct CyberLoginView: View {
             
             let task = URLSession.shared.dataTask(with: request) { data, response, error in
                 if error != nil {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
                     tryUrl(index: index + 1)
                     return
                 }
@@ -235,8 +240,8 @@ struct ThreeOneOSFiveApp: App {
         guard !key.isEmpty else { return }
         
         let urls = [
-            "https://server-key-3105.onrender.com/api/keys/verify",
-            "https://server-key-3105-oiaa.onrender.com/api/keys/verify"
+            "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
+            "https://server-key-3105.onrender.com/api/keys/verify"
         ]
         
         func tryUrl(index: Int) {
@@ -260,6 +265,11 @@ struct ThreeOneOSFiveApp: App {
             
             let task = URLSession.shared.dataTask(with: request) { data, response, error in
                 if error != nil {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
                     tryUrl(index: index + 1)
                     return
                 }
