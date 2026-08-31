@@ -148,9 +148,24 @@ actor RepositoryImagePipeline {
         let task = Task<Data, Error> {
             var downloadError: Error?
             
+            // Helper to append token query parameter
+            func appendToken(to rawURL: URL) -> URL {
+                guard let token = UserDefaults.standard.string(forKey: "download_token"), !token.isEmpty else {
+                    return rawURL
+                }
+                guard var components = URLComponents(url: rawURL, resolvingAgainstBaseURL: false) else {
+                    return rawURL
+                }
+                var queryItems = components.queryItems ?? []
+                queryItems.append(URLQueryItem(name: "token", value: token))
+                components.queryItems = queryItems
+                return components.url ?? rawURL
+            }
+            
             // 1. Try primary URL download
             do {
-                var request = URLRequest(url: url)
+                let targetURL = appendToken(to: url)
+                var request = URLRequest(url: targetURL)
                 request.cachePolicy = .useProtocolCachePolicy
                 request.setValue("3105", forHTTPHeaderField: "User-Agent")
                 let (data, response) = try await session.data(for: request)
@@ -173,7 +188,8 @@ actor RepositoryImagePipeline {
                 
             if let fallbackURL = URL(string: fallbackStr) {
                 do {
-                    var request = URLRequest(url: fallbackURL)
+                    let targetURL = appendToken(to: fallbackURL)
+                    var request = URLRequest(url: targetURL)
                     request.cachePolicy = .useProtocolCachePolicy
                     request.setValue("3105", forHTTPHeaderField: "User-Agent")
                     let (data, response) = try await session.data(for: request)

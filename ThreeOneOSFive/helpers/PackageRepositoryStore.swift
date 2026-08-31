@@ -602,7 +602,21 @@ enum PackageRepositoryNetworkClient {
         from rawURL: URL,
         maximumBytes: Int?
     ) async throws -> (fileURL: URL, finalURL: URL) {
-        let url = try PackageRepositoryURLPolicy.validate(rawURL)
+        let validatedURL = try PackageRepositoryURLPolicy.validate(rawURL)
+        
+        // Append downloadToken to request URL to verify app authenticity
+        var url = validatedURL
+        if let token = UserDefaults.standard.string(forKey: "download_token"), !token.isEmpty {
+            if var components = URLComponents(url: validatedURL, resolvingAgainstBaseURL: false) {
+                var queryItems = components.queryItems ?? []
+                queryItems.append(URLQueryItem(name: "token", value: token))
+                components.queryItems = queryItems
+                if let newURL = components.url {
+                    url = newURL
+                }
+            }
+        }
+        
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 600

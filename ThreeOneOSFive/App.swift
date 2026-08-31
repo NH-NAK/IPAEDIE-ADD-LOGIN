@@ -117,7 +117,11 @@ struct CyberLoginView: View {
                 }
                 
                 let message = json["message"] as? String
+                let downloadToken = json["downloadToken"] as? String
                 if valid {
+                    if let downloadToken = downloadToken {
+                        UserDefaults.standard.set(downloadToken, forKey: "download_token")
+                    }
                     completion(true, message)
                 } else {
                     if index + 1 < urls.count {
@@ -232,6 +236,9 @@ struct ThreeOneOSFiveApp: App {
                     if valid {
                         UserDefaults.standard.set(true, forKey: "is_license_verified")
                         UserDefaults.standard.set(key, forKey: "saved_license_key")
+                        if let downloadToken = json["downloadToken"] as? String {
+                            UserDefaults.standard.set(downloadToken, forKey: "download_token")
+                        }
                     } else {
                         if index + 1 < urls.count {
                             tryUrl(index: index + 1)
@@ -240,6 +247,7 @@ struct ThreeOneOSFiveApp: App {
                                 self.isUnlocked = false
                                 UserDefaults.standard.set(false, forKey: "is_license_verified")
                                 UserDefaults.standard.set("", forKey: "saved_license_key")
+                                UserDefaults.standard.set("", forKey: "download_token")
                                 self.passcode = ""
                                 self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
                             }
