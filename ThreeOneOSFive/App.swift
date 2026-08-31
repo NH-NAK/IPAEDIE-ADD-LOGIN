@@ -96,7 +96,8 @@ struct CyberLoginView: View {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let body = ["key": key, "deviceId": deviceId]
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+            let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
                 return
@@ -110,8 +111,18 @@ struct CyberLoginView: View {
                 }
                 
                 guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let valid = json["valid"] as? Bool else {
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                if let updateRequired = json["updateRequired"] as? Bool, updateRequired {
+                    let msg = json["message"] as? String ?? "App needs to update to new version"
+                    self.showForcedUpdateAlert(message: msg)
+                    return
+                }
+                
+                guard let valid = json["valid"] as? Bool else {
                     tryUrl(index: index + 1)
                     return
                 }
@@ -192,6 +203,32 @@ struct ThreeOneOSFiveApp: App {
     private let licenseCheckTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     // ----------------------------
 
+    private func showForcedUpdateAlert(message: String) {
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: "UPDATE REQUIRED",
+                message: message,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+                exit(0)
+            })
+            
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = scene.windows.first {
+                var topVC = window.rootViewController
+                while let presented = topVC?.presentedViewController {
+                    topVC = presented
+                }
+                topVC?.present(alert, animated: true, completion: nil)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    exit(0)
+                }
+            }
+        }
+    }
+
     private func verifyLicenseInBackground() {
         let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
         guard !key.isEmpty else { return }
@@ -212,7 +249,8 @@ struct ThreeOneOSFiveApp: App {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let body = ["key": key, "deviceId": deviceId]
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+            let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
                 return
@@ -226,8 +264,18 @@ struct ThreeOneOSFiveApp: App {
                 }
                 
                 guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let valid = json["valid"] as? Bool else {
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    tryUrl(index: index + 1)
+                    return
+                }
+                
+                if let updateRequired = json["updateRequired"] as? Bool, updateRequired {
+                    let msg = json["message"] as? String ?? "App needs to update to new version"
+                    self.showForcedUpdateAlert(message: msg)
+                    return
+                }
+                
+                guard let valid = json["valid"] as? Bool else {
                     tryUrl(index: index + 1)
                     return
                 }
