@@ -145,18 +145,12 @@ private struct RepositorySourceRow: View {
         HStack(spacing: 12) {
             RepositorySourceIcon(
                 repository: store.repository(for: source.id),
-                fallbackText: store.repository(for: source.id)?.name
-                    ?? source.manifestURL.host
-                    ?? "3105"
+                fallbackText: source.iconText
             )
-            Text(
-                store.repository(for: source.id)?.name
-                    ?? source.manifestURL.host
-                    ?? language.text("repository.unknown_source")
-            )
-            .font(.body.weight(.semibold))
-            .foregroundStyle(.primary)
-            .lineLimit(2)
+            Text(source.displayName)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
         }
         .padding(.vertical, 4)
     }
@@ -249,8 +243,7 @@ private struct RepositorySourceDetailView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle(
-            repository?.name
-                ?? source?.manifestURL.host
+            source?.displayName
                 ?? language.text("repository.unknown_source")
         )
         .navigationBarTitleDisplayMode(.inline)
@@ -291,13 +284,10 @@ private struct RepositorySourceDetailView: View {
             HStack(alignment: .top, spacing: 14) {
                 RepositorySourceIcon(
                     repository: repository,
-                    fallbackText: repository?.name
-                        ?? source?.manifestURL.host
-                        ?? "3105"
+                    fallbackText: source?.iconText ?? "3105"
                 )
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(repository?.name
-                        ?? source?.manifestURL.host
+                    Text(source?.displayName
                         ?? language.text("repository.unknown_source"))
                         .font(.body.weight(.semibold))
                     if let summary = repository?.summary {
@@ -409,5 +399,29 @@ private struct RepositoryTagPackagesView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private extension RepositorySource {
+    var displayName: String {
+        let host = manifestURL.host?.lowercased() ?? ""
+        if host.contains("server-key-3105.onrender.com") && !host.contains("-oiaa") {
+            return "Server V1"
+        }
+        if host.contains("server-key-3105-oiaa.onrender.com") {
+            return "Server V2"
+        }
+        return host
+    }
+
+    var iconText: String {
+        let host = manifestURL.host?.lowercased() ?? ""
+        if host.contains("server-key-3105.onrender.com") && !host.contains("-oiaa") {
+            return "V1"
+        }
+        if host.contains("server-key-3105-oiaa.onrender.com") {
+            return "V2"
+        }
+        return String(host.prefix(1)).uppercased()
     }
 }

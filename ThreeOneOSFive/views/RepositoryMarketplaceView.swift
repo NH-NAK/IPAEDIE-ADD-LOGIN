@@ -955,8 +955,9 @@ struct RepositorySourceIcon: View {
     }
 
     private var placeholder: some View {
-        Text(String(fallbackText.prefix(1)).uppercased())
-            .font(.headline)
+        let displayStr = fallbackText.count <= 2 ? fallbackText.uppercased() : String(fallbackText.prefix(1)).uppercased()
+        return Text(displayStr)
+            .font(displayStr.count > 1 ? .caption.weight(.bold) : .headline)
             .foregroundStyle(AppTheme.accent)
     }
 }
