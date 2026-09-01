@@ -9,7 +9,6 @@ struct CyberLoginView: View {
     @Binding var isUnlocked: Bool
     @Binding var attempts: Int
     @Binding var isLockedOut: Bool
-    let correctKey: String
     let onForcedUpdateRequired: (String) -> Void
     
     var body: some View {
@@ -19,11 +18,13 @@ struct CyberLoginView: View {
             VStack(spacing: 30) {
                 Spacer()
                 
-                VStack(spacing: 10) {
-                    Image(systemName: "key.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.red)
-                        .shadow(color: .red, radius: 10)
+                VStack(spacing: 14) {
+                    Image("AppIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 85, height: 85)
+                        .cornerRadius(18)
+                        .shadow(color: .red.opacity(0.6), radius: 12)
                     
                     Text("COBALT SHIELD")
                         .font(.custom("Orbitron", size: 24))
@@ -36,10 +37,10 @@ struct CyberLoginView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 10)
                 
                 VStack(spacing: 20) {
-                    TextField("ENTER LICENSE KEY", text: $passcode)
+                    SecureField("បញ្ចូល KEY ចូលប្រើប្រាស់...", text: $passcode)
                         .font(.system(.body, design: .monospaced))
                         .padding()
                         .background(Color.white.opacity(0.05))
@@ -53,21 +54,12 @@ struct CyberLoginView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.characters)
                         .disabled(isLockedOut)
-                    
-                    Button(action: {
-                        submitKey()
-                    }) {
-                        Text("VERIFY ACCESS")
-                            .font(.custom("Orbitron", size: 16))
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isLockedOut ? Color.gray : Color.red)
-                            .cornerRadius(8)
-                            .shadow(color: isLockedOut ? .clear : .red, radius: 5)
-                    }
-                    .disabled(isLockedOut)
+                        .onChange(of: passcode) { newValue in
+                            let cleaned = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !cleaned.isEmpty && !isLockedOut {
+                                submitKey(keyToVerify: cleaned)
+                            }
+                        }
                 }
                 .padding(.horizontal, 40)
                 
@@ -154,17 +146,18 @@ struct CyberLoginView: View {
         tryUrl(index: 0)
     }
 
-    private func submitKey() {
-        let key = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else {
-            loginMessage = "PLEASE ENTER A KEY"
-            return
-        }
+    @State private var isVerifying = false
+
+    private func submitKey(keyToVerify: String? = nil) {
+        let key = (keyToVerify ?? passcode).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !isVerifying else { return }
         
-        loginMessage = "VERIFYING SECURITY KEY..."
+        isVerifying = true
+        loginMessage = "កំពុងផ្ទៀងផ្ទាត់ KEY..."
         verifyKeyOnline(key: key) { success, message in
             DispatchQueue.main.async {
-                if success || key == correctKey {
+                isVerifying = false
+                if success {
                     UserDefaults.standard.set(true, forKey: "is_license_verified")
                     UserDefaults.standard.set(key, forKey: "saved_license_key")
                     withAnimation(.easeInOut) {
@@ -175,9 +168,9 @@ struct CyberLoginView: View {
                     passcode = ""
                     if attempts >= 3 {
                         isLockedOut = true
-                        loginMessage = "ACCESS DENIED - SYSTEM LOCKED"
+                        loginMessage = "ប្រព័ន្ធត្រូវបានចាក់សោ - ACCESS DENIED"
                     } else {
-                        loginMessage = message?.uppercased() ?? "INVALID KEY. \(3 - attempts) TRIES LEFT."
+                        loginMessage = message?.uppercased() ?? "KEY មិនត្រឹមត្រូវ! សល់ការសាកល្បង \(3 - attempts) លើកទៀត"
                     }
                 }
             }
@@ -203,17 +196,16 @@ struct ThreeOneOSFiveApp: App {
     // --- Passcode Login state ---
     @State private var isUnlocked = UserDefaults.standard.bool(forKey: "is_license_verified")
     @State private var passcode = ""
-    @State private var loginMessage = "ENTER SECURITY KEY"
+    @State private var loginMessage = "សូមបញ្ចូល KEY សម្រាប់ចូលប្រើប្រាស់"
     @State private var attempts = 0
     @State private var isLockedOut = false
-    private let correctKey = "6767" 
     private let licenseCheckTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     // ----------------------------
 
     private func showForcedUpdateAlert(message: String) {
         DispatchQueue.main.async {
             let alert = UIAlertController(
-                title: "UPDATE REQUIRED",
+                title: "Update",
                 message: message,
                 preferredStyle: .alert
             )
@@ -303,14 +295,12 @@ struct ThreeOneOSFiveApp: App {
                         if index + 1 < urls.count {
                             tryUrl(index: index + 1)
                         } else {
-                            if key != self.correctKey {
-                                self.isUnlocked = false
-                                UserDefaults.standard.set(false, forKey: "is_license_verified")
-                                UserDefaults.standard.set("", forKey: "saved_license_key")
-                                UserDefaults.standard.set("", forKey: "download_token")
-                                self.passcode = ""
-                                self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
-                            }
+                            self.isUnlocked = false
+                            UserDefaults.standard.set(false, forKey: "is_license_verified")
+                            UserDefaults.standard.set("", forKey: "saved_license_key")
+                            UserDefaults.standard.set("", forKey: "download_token")
+                            self.passcode = ""
+                            self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
                         }
                     }
                 }
@@ -380,7 +370,6 @@ struct ThreeOneOSFiveApp: App {
                         isUnlocked: $isUnlocked,
                         attempts: $attempts,
                         isLockedOut: $isLockedOut,
-                        correctKey: correctKey,
                         onForcedUpdateRequired: showForcedUpdateAlert
                     )
                 }
