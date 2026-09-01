@@ -26,7 +26,7 @@ struct CyberLoginView: View {
                         .cornerRadius(18)
                         .shadow(color: .red.opacity(0.6), radius: 12)
                     
-                    Text("COBALT SHIELD")
+                    Text("សួស្ដីអ្នកទាំងអស់គ្នា")
                         .font(.custom("Orbitron", size: 24))
                         .fontWeight(.black)
                         .foregroundColor(.white)
