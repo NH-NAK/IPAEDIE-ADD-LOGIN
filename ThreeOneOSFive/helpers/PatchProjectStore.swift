@@ -284,6 +284,10 @@ final class PatchProjectStore: ObservableObject {
 
     func delete(_ item: PatchLibraryItem) {
         do {
+            if let project = item.project,
+               let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
+                try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+            }
             try PatchProjectLibrary.delete(item)
             reload()
         } catch let error as PatchPackageError {

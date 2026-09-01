@@ -111,6 +111,20 @@ struct PatchProjectsView: View {
                             Section(language.text("patch.title")) {
                                 ForEach(filteredItems) { item in
                                     itemRow(item)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                store.delete(item)
+                                            } label: {
+                                                Label(language.text("common.delete"), systemImage: "trash")
+                                            }
+                                        }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                store.delete(item)
+                                            } label: {
+                                                Label(language.text("common.delete"), systemImage: "trash")
+                                            }
+                                        }
                                 }
                                 .onDelete { offsets in
                                     offsets.map { filteredItems[$0] }.forEach(store.delete)
@@ -732,6 +746,7 @@ private struct PatchProjectDetailView: View {
     @State private var editingRule: PatchRule?
     @State private var showApplyConfirmation = false
     @State private var showRestoreConfirmation = false
+    @State private var showDeleteConfirmation = false
     @State private var showChangedRestoreConfirmation = false
     @State private var showResetConfirmation = false
     @State private var restoreChangedPaths: [String] = []
@@ -900,6 +915,16 @@ private struct PatchProjectDetailView: View {
                 } footer: {
                     Text(language.text("patch.apply_footer"))
                 }
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        actionLabel("patch.delete_package", systemImage: "trash.fill")
+                            .foregroundStyle(.red)
+                    }
+                    .disabled(isWorking)
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -961,6 +986,20 @@ private struct PatchProjectDetailView: View {
             Button(language.text("common.cancel"), role: .cancel) {}
         } message: {
             Text(changedRestoreMessage)
+        }
+        .confirmationDialog(
+            language.text("patch.delete_package_confirm_title"),
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(language.text("common.delete"), role: .destructive) {
+                if let item {
+                    store.delete(item)
+                }
+            }
+            Button(language.text("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(language.text("patch.delete_package_confirm_message"))
         }
         .confirmationDialog(
             language.text("patch.reset_confirm_title"),

@@ -193,7 +193,7 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var patchStore = PatchProjectStore()
     @StateObject private var repositoryStore = PackageRepositoryStore()
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
-    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = true
+    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = false
     @State private var showOnboarding = OnboardingStore.shouldShow()
     @State private var showAttribution = false
     @State private var updateOffer: AppUpdateChecker.Offer?

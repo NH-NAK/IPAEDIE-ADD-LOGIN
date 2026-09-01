@@ -8,7 +8,7 @@ struct SettingsView: View {
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @AppStorage(FeatureVisibility.developerModeStorageKey)
     private var developerModeEnabled = false
-    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = true
+    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = false
 
     @State private var showRestoreConfirmation = false
     @State private var showRestoreSuccessAlert = false

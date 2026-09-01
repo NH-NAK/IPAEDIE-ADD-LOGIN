@@ -675,4 +675,8 @@
 "settings.clean_restore_success_message" = "Successfully restored original files for %lld mod patch(es).";
 "settings.auto_restore_on_exit" = "Auto Restore on App Exit";
 "settings.auto_restore_footer" = "Automatically reverts all active game mods and restores clean original game assets whenever 3105 is closed, backgrounded, or swiped away.";
+"patch.delete_package" = "Delete Patch Package";
+"patch.delete_package_confirm_title" = "Delete this patch package?";
+"patch.delete_package_confirm_message" = "This patch package and its active mod files will be permanently deleted from 3105. Original game files will be restored.";
+
 
