@@ -406,10 +406,10 @@ private extension RepositorySource {
     var displayName: String {
         let host = manifestURL.host?.lowercased() ?? ""
         if host.contains("server-key-3105.onrender.com") && !host.contains("-oiaa") {
-            return "Server V1"
+            return "V1"
         }
         if host.contains("server-key-3105-oiaa.onrender.com") {
-            return "Server V2"
+            return "V2"
         }
         return host
     }
