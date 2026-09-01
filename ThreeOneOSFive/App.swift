@@ -19,7 +19,7 @@ struct CyberLoginView: View {
                 Spacer()
                 
                 VStack(spacing: 14) {
-                    Image("AppIcon")
+                    Image("HackerIcon")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 85, height: 85)
