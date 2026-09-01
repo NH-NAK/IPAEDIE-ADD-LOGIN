@@ -75,6 +75,22 @@ enum DevicePatchService {
         return PatchTransaction.latestReceipt(projectID: projectID, backupRoot: backupRoot)
     }
 
+    @discardableResult
+    static func restoreAllAppliedPatches() throws -> Int {
+        guard let backupRoot = try? PatchProjectLibrary.backupRootURL() else { return 0 }
+        let receipts = PatchTransaction.allAppliedReceipts(backupRoot: backupRoot)
+        var restoredCount = 0
+        for receipt in receipts {
+            do {
+                try restore(receipt: receipt, allowChangedTargets: true)
+                restoredCount += 1
+            } catch {
+                // Continue restoring remaining receipts
+            }
+        }
+        return restoredCount
+    }
+
     private static func orderedBundleIdentifiers(in project: PatchProject) -> [String] {
         project.allBundleIdentifiers
     }

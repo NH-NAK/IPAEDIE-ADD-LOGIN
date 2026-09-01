@@ -97,7 +97,7 @@ struct CyberLoginView: View {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1"
             let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -193,6 +193,7 @@ struct ThreeOneOSFiveApp: App {
     @StateObject private var patchStore = PatchProjectStore()
     @StateObject private var repositoryStore = PackageRepositoryStore()
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
+    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = true
     @State private var showOnboarding = OnboardingStore.shouldShow()
     @State private var showAttribution = false
     @State private var updateOffer: AppUpdateChecker.Offer?
@@ -255,7 +256,7 @@ struct ThreeOneOSFiveApp: App {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1"
             let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -408,9 +409,12 @@ struct ThreeOneOSFiveApp: App {
                 verifyLicenseInBackground()
             }
             .onChange(of: scenePhase) { phase in
-                guard phase == .active, !showOnboarding else { return }
-                appState.detectSupport()
-                verifyLicenseInBackground()
+                if phase == .active, !showOnboarding {
+                    appState.detectSupport()
+                    verifyLicenseInBackground()
+                } else if (phase == .background || phase == .inactive) && autoRestoreOnExit {
+                    try? DevicePatchService.restoreAllAppliedPatches()
+                }
             }
             .onOpenURL { url in
                 if isUnlocked {
@@ -420,6 +424,11 @@ struct ThreeOneOSFiveApp: App {
             .onReceive(licenseCheckTimer) { _ in
                 if isUnlocked {
                     verifyLicenseInBackground()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                if autoRestoreOnExit {
+                    try? DevicePatchService.restoreAllAppliedPatches()
                 }
             }
         }

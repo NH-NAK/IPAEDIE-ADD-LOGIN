@@ -506,15 +506,28 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
+    @State private var isAppliedState: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
-            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : "shippingbox.fill")
+            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : (isAppliedState ? "checkmark.seal.fill" : "shippingbox.fill"))
+                .foregroundStyle(isAppliedState ? AppTheme.accent : .secondary)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.project?.name ?? language.text("patch.locked_project"))
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack {
+                    Text(item.project?.name ?? language.text("patch.locked_project"))
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if isAppliedState {
+                        Text("ACTIVE")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.2))
+                            .foregroundStyle(Color.green)
+                            .clipShape(Capsule())
+                    }
+                }
                 InstalledContentKindBadge(kind: .patch, language: language)
                 if let author = item.project?.author, !author.isEmpty {
                     Text(language.text("patch.by_author", author))
@@ -538,8 +551,51 @@ private struct PatchProjectRow: View {
                     .foregroundStyle(AppTheme.accent)
                     .accessibilityLabel(language.text("patch.private"))
             }
+            if let project = item.project, !item.isLocked {
+                Toggle("", isOn: Binding(
+                    get: { isAppliedState },
+                    set: { enabled in
+                        toggleMod(project: project, enabled: enabled)
+                    }
+                ))
+                .labelsHidden()
+                .tint(AppTheme.accent)
+            }
         }
         .padding(.vertical, 4)
+        .onAppear {
+            refreshState()
+        }
+    }
+
+    private func refreshState() {
+        guard let project = item.project else {
+            isAppliedState = false
+            return
+        }
+        isAppliedState = DevicePatchService.latestReceipt(projectID: project.id) != nil
+    }
+
+    private func toggleMod(project: PatchProject, enabled: Bool) {
+        if enabled {
+            do {
+                _ = try DevicePatchService.apply(project: project)
+                isAppliedState = true
+            } catch {
+                isAppliedState = false
+            }
+        } else {
+            if let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
+                do {
+                    try DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+                    isAppliedState = false
+                } catch {
+                    isAppliedState = true
+                }
+            } else {
+                isAppliedState = false
+            }
+        }
     }
 
     private var rowDetail: String {

@@ -8,6 +8,11 @@ struct SettingsView: View {
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @AppStorage(FeatureVisibility.developerModeStorageKey)
     private var developerModeEnabled = false
+    @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = true
+
+    @State private var showRestoreConfirmation = false
+    @State private var showRestoreSuccessAlert = false
+    @State private var restoredCount = 0
 
     var body: some View {
         NavigationStack {
@@ -46,10 +51,32 @@ struct SettingsView: View {
                             systemImage: "hammer.fill"
                         )
                     }
+                    Toggle(isOn: $autoRestoreOnExit) {
+                        Label(
+                            language.text("settings.auto_restore_on_exit"),
+                            systemImage: "clock.arrow.circlepath"
+                        )
+                    }
                 } header: {
                     Text(language.text("dashboard.features"))
                 } footer: {
-                    Text(language.text("settings.developer_mode_footer"))
+                    Text(language.text("settings.auto_restore_footer"))
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showRestoreConfirmation = true
+                    } label: {
+                        Label(
+                            language.text("settings.clean_restore"),
+                            systemImage: "arrow.counterclockwise.circle.fill"
+                        )
+                        .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text(language.text("tab.cleaner"))
+                } footer: {
+                    Text(language.text("settings.clean_restore_desc"))
                 }
 
                 if WallpaperFeatureSupportPolicy.isSupported(
@@ -152,6 +179,35 @@ struct SettingsView: View {
                         .fontWeight(.semibold)
                 }
             }
+            .alert(
+                language.text("settings.clean_restore_confirm_title"),
+                isPresented: $showRestoreConfirmation
+            ) {
+                Button(language.text("common.cancel"), role: .cancel) {}
+                Button(language.text("settings.clean_restore"), role: .destructive) {
+                    performRestore()
+                }
+            } message: {
+                Text(language.text("settings.clean_restore_confirm_message"))
+            }
+            .alert(
+                language.text("settings.clean_restore_success_title"),
+                isPresented: $showRestoreSuccessAlert
+            ) {
+                Button(language.text("common.done"), role: .cancel) {}
+            } message: {
+                Text(language.text("settings.clean_restore_success_message", Int64(restoredCount)))
+            }
+        }
+    }
+
+    private func performRestore() {
+        do {
+            let count = try DevicePatchService.restoreAllAppliedPatches()
+            restoredCount = count
+            showRestoreSuccessAlert = true
+        } catch {
+            // Error handling fallback
         }
     }
 

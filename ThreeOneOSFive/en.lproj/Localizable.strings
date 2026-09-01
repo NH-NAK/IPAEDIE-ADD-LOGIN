@@ -667,3 +667,12 @@
 "settings.developer_mode_footer" = "Developer Mode adds Files to the main navigation. Files can browse and modify application containers.";
 "wallpaper.package_details" = "Package Details";
 "wallpaper.package_files" = "%lld files";
+"settings.clean_restore" = "Clean & Restore Original Files";
+"settings.clean_restore_desc" = "Remove all active game mods and restore original game asset files.";
+"settings.clean_restore_confirm_title" = "Restore All Original Files?";
+"settings.clean_restore_confirm_message" = "This will revert all active mods and restore original game files so you can play legit or prepare for game updates.";
+"settings.clean_restore_success_title" = "Original Files Restored";
+"settings.clean_restore_success_message" = "Successfully restored original files for %lld mod patch(es).";
+"settings.auto_restore_on_exit" = "Auto Restore on App Exit";
+"settings.auto_restore_footer" = "Automatically reverts all active game mods and restores clean original game assets whenever 3105 is closed, backgrounded, or swiped away.";
+

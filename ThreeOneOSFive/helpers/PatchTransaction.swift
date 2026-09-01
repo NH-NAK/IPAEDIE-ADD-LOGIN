@@ -519,6 +519,30 @@ enum PatchTransaction {
         }
     }
 
+    static func allAppliedReceipts(
+        backupRoot: URL,
+        fileManager: FileManager = .default
+    ) -> [PatchTransactionReceipt] {
+        guard let projectDirectories = try? fileManager.contentsOfDirectory(
+            at: backupRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var receipts: [PatchTransactionReceipt] = []
+        for directory in projectDirectories {
+            guard let projectID = UUID(uuidString: directory.lastPathComponent),
+                  let receipt = latestReceipt(
+                    projectID: projectID,
+                    backupRoot: backupRoot,
+                    fileManager: fileManager
+                  )
+            else { continue }
+            receipts.append(receipt)
+        }
+        return receipts
+    }
+
     static func appliedTargetKeys(
         backupRoot: URL,
         excludingProjectID: UUID? = nil,
