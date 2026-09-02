@@ -21,40 +21,50 @@ struct LegacyRepositoryExploreView: View {
         return UserDefaults.standard.stringArray(forKey: "license_allowed_games") ?? ["ALL"]
     }
 
-    private var filteredPackages: [RepositoryPackageRecord] {
-        let allPkgs = repositoryStore.packages
+    private func matchesLicenseFilter(_ record: RepositoryPackageRecord) -> Bool {
         let currentAllowed = allowedGames
-        return allPkgs.filter { record in
-            let name = record.package.name.uppercased()
-            let summary = record.package.summary.uppercased()
-            let tags = record.package.tags.map { $0.uppercased() }
-            let category = record.package.category?.uppercased() ?? ""
-
-            // 1. License Key Tier Filter
-            if !currentAllowed.contains("ALL") && !currentAllowed.contains("VIP_ALL") {
-                var matchesLicense = false
-                if currentAllowed.contains("MLBB") && (name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category == "MLBB") {
-                    matchesLicense = true
-                }
-                if currentAllowed.contains("FFTH") && (name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category == "FFTH") {
-                    matchesLicense = true
-                }
-                if currentAllowed.contains("FFM") && (name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category == "FFM" || summary.contains("FREE FIRE MAX")) {
-                    matchesLicense = true
-                }
-                if !matchesLicense { return false }
-            }
-
-            // 2. Selected UI Game Category Filter
-            if selectedGameFilter == "MLBB" {
-                return name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB")
-            } else if selectedGameFilter == "FFTH" {
-                return name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH")
-            } else if selectedGameFilter == "FFM" {
-                return name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX")
-            }
-
+        guard !currentAllowed.contains("ALL") && !currentAllowed.contains("VIP_ALL") else {
             return true
+        }
+
+        let name = record.package.name.uppercased()
+        let summary = record.package.summary.uppercased()
+        let tags = record.package.tags.map { $0.uppercased() }
+        let category = record.package.category?.uppercased() ?? ""
+
+        if currentAllowed.contains("MLBB") && (name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category == "MLBB") {
+            return true
+        }
+        if currentAllowed.contains("FFTH") && (name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category == "FFTH") {
+            return true
+        }
+        if currentAllowed.contains("FFM") && (name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category == "FFM" || summary.contains("FREE FIRE MAX")) {
+            return true
+        }
+        return false
+    }
+
+    private func matchesGameFilter(_ record: RepositoryPackageRecord) -> Bool {
+        let name = record.package.name.uppercased()
+        let summary = record.package.summary.uppercased()
+        let tags = record.package.tags.map { $0.uppercased() }
+        let category = record.package.category?.uppercased() ?? ""
+
+        switch selectedGameFilter {
+        case "MLBB":
+            return name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB")
+        case "FFTH":
+            return name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH")
+        case "FFM":
+            return name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX")
+        default:
+            return true
+        }
+    }
+
+    private var filteredPackages: [RepositoryPackageRecord] {
+        repositoryStore.packages.filter { record in
+            matchesLicenseFilter(record) && matchesGameFilter(record)
         }
     }
 
