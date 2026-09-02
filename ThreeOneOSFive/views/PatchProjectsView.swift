@@ -17,6 +17,7 @@ struct PatchProjectsView: View {
     @Environment(\.appLanguage) private var language
     @EnvironmentObject private var draftCoordinator: PatchDraftCoordinator
     @EnvironmentObject private var store: PatchProjectStore
+    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @State private var showCreate = false
     @State private var showImporter = false
@@ -462,7 +463,7 @@ struct PatchProjectsView: View {
             NavigationLink {
                 PatchProjectDetailView(store: store, projectID: item.id)
             } label: {
-                PatchProjectRow(item: item, language: language)
+                PatchProjectRow(item: item, language: language, repositoryStore: repositoryStore)
             }
         }
     }
@@ -523,7 +524,7 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
-    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
+    let repositoryStore: PackageRepositoryStore
     @State private var isAppliedState: Bool = false
 
     private var matchingPackage: RepositoryPackage? {
