@@ -106,16 +106,21 @@ struct LegacyRepositoryExploreView: View {
                 repositoryStore.refreshAllIfNeeded()
             }
             .sheet(item: $activeTool) { tool in
-                switch tool {
-                case .cleaner:
-                    CleanerView()
-                case .wallpaper:
-                    WallpaperLabView()
-                }
+                toolSheetContent(tool)
             }
             .navigationDestination(for: RepositoryPackageRecord.self) { record in
                 RepositoryPackageDetailView(record: record)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func toolSheetContent(_ tool: BuiltInTool) -> some View {
+        switch tool {
+        case .cleaner:
+            CleanerView()
+        case .wallpaper:
+            WallpaperLabView()
         }
     }
 
