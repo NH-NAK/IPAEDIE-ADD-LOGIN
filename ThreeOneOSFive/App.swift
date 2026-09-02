@@ -508,7 +508,9 @@ struct ThreeOneOSFiveApp: App {
                 tryConfig(index: index + 1)
                 return
             }
-            URLSession.shared.dataTask(with: url) { data, response, _ in
+            var request = URLRequest(url: url)
+            request.setValue("3105-App", forHTTPHeaderField: "User-Agent")
+            URLSession.shared.dataTask(with: request) { data, response, _ in
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
                     tryConfig(index: index + 1)
                     return
