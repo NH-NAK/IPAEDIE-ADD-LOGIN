@@ -125,13 +125,11 @@ struct LegacyRepositoryExploreView: View {
 
     @ToolbarContentBuilder
     private var toolbarTrailing: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            AppUtilityToolbar(
-                language: language,
-                onOpenSettings: onOpenSettings,
-                onOpenLogs: onOpenLogs
-            )
-        }
+        AppUtilityToolbar(
+            language: language,
+            onOpenSettings: onOpenSettings,
+            onOpenLogs: onOpenLogs
+        )
     }
 
     @ViewBuilder
