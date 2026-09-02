@@ -254,6 +254,7 @@ final class PackageRepositoryStore: ObservableObject {
                     ) else {
                         throw PackageRepositoryError.importUnavailable
                     }
+                    reportDownloadCount(for: record.package.identifier)
                     log(
                         "repository: handed off \(record.package.identifier) " +
                             "to patch import"
@@ -307,6 +308,14 @@ final class PackageRepositoryStore: ObservableObject {
                 repositoryIdentity: record.repositoryIdentity
             )
         }
+    }
+
+    private func reportDownloadCount(for packageIdentifier: String) {
+        guard let url = URL(string: "https://server-key-3105-6sbz.onrender.com/api/packages/\(packageIdentifier)/download-count") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 5.0
+        URLSession.shared.dataTask(with: request).resume()
     }
 
     private func persist() {

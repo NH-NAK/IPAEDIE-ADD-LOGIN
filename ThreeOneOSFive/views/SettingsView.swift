@@ -31,6 +31,10 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
 
+                Section("VIP License (អាជ្ញាប័ណ្ណ)") {
+                    VIPLicenseDetailRow()
+                }
+
                 Section(language.text("settings.language")) {
                     Picker(language.text("settings.language"), selection: $languageCode) {
                         ForEach(AppLanguage.allCases) { option in
@@ -258,5 +262,45 @@ struct SettingsView: View {
             }
             .accessibilityLabel(language.text("accessibility.open_profile", name))
         }
+    }
+}
+
+struct VIPLicenseDetailRow: View {
+    @AppStorage("license_expires_at") private var expiresAtString: String = "lifetime"
+    @AppStorage("user_passcode") private var savedKey: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("ប្រភេទ Key:")
+                Spacer()
+                VIPLicenseCountdownBadge()
+            }
+            if !savedKey.isEmpty {
+                HStack {
+                    Text("Key បច្ចុប្បន្ន:")
+                    Spacer()
+                    Text(savedKey)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Button(role: .destructive) {
+                UserDefaults.standard.set(false, forKey: "is_license_verified")
+                UserDefaults.standard.set("", forKey: "user_passcode")
+                exit(0)
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("ផ្លាស់ប្តូរ Key ថ្មី (Logout Key)")
+                        .fontWeight(.bold)
+                    Spacer()
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .padding(.top, 4)
+        }
+        .padding(.vertical, 4)
     }
 }

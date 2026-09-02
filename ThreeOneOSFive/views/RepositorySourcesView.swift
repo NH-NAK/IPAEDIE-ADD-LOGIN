@@ -405,22 +405,28 @@ private struct RepositoryTagPackagesView: View {
 private extension RepositorySource {
     var displayName: String {
         let host = manifestURL.host?.lowercased() ?? ""
-        if host.contains("server-key-3105.onrender.com") && !host.contains("-oiaa") {
-            return "V1"
+        if host.contains("server-key-3105-6sbz.onrender.com") {
+            return "V3"
         }
         if host.contains("server-key-3105-oiaa.onrender.com") {
             return "V2"
+        }
+        if host.contains("server-key-3105.onrender.com") {
+            return "V1"
         }
         return host
     }
 
     var iconText: String {
         let host = manifestURL.host?.lowercased() ?? ""
-        if host.contains("server-key-3105.onrender.com") && !host.contains("-oiaa") {
-            return "V1"
+        if host.contains("server-key-3105-6sbz.onrender.com") {
+            return "V3"
         }
         if host.contains("server-key-3105-oiaa.onrender.com") {
             return "V2"
+        }
+        if host.contains("server-key-3105.onrender.com") {
+            return "V1"
         }
         return String(host.prefix(1)).uppercased()
     }
