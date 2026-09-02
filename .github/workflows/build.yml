@@ -34,10 +34,10 @@ jobs:
       run: |
         mkdir -p Payload
         cp -r build/Release-iphoneos/3105.app Payload/3105.app
-        zip -r 3105_patched.ipa Payload
+        zip -r 3105_v2.2.ipa Payload
 
-    - name: Upload Patched IPA
+    - name: Upload Patched IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: 3105-Patched-IPA
-        path: 3105_patched.ipa
+        name: 3105-v2.2-IPA
+        path: 3105_v2.2.ipa
