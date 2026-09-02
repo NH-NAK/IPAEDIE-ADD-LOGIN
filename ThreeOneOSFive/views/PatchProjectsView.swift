@@ -528,12 +528,14 @@ private struct PatchProjectRow: View {
 
     private var matchingPackage: RepositoryPackage? {
         guard let name = item.project?.name else { return nil }
-        return repositoryStore.packages.first { pkg in
-            pkg.name.caseInsensitiveCompare(name) == .orderedSame ||
-            pkg.name.replacingOccurrences(of: "_", with: " ").caseInsensitiveCompare(name.replacingOccurrences(of: "_", with: " ")) == .orderedSame ||
-            pkg.download.contains(name) ||
-            name.contains(pkg.name)
+        let cleanName = name.replacingOccurrences(of: "_", with: " ").lowercased()
+        for pkg in repositoryStore.packages {
+            let pkgName = pkg.name.replacingOccurrences(of: "_", with: " ").lowercased()
+            if pkgName == cleanName || pkg.download.lowercased().contains(cleanName) || cleanName.contains(pkgName) {
+                return pkg
+            }
         }
+        return nil
     }
 
     var body: some View {
