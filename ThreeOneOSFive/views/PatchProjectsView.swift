@@ -456,7 +456,7 @@ struct PatchProjectsView: View {
     private func itemRow(_ item: PatchLibraryItem) -> some View {
         if item.isLocked {
             Button { store.requestUnlock(for: item) } label: {
-                PatchProjectRow(item: item, language: language)
+                PatchProjectRow(item: item, language: language, repositoryStore: repositoryStore)
             }
             .buttonStyle(.plain)
         } else {
