@@ -6,23 +6,65 @@ struct LegacyRepositoryExploreView: View {
     @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
     @State private var activeTool: BuiltInTool?
+    @State private var selectedGameFilter: String = "ALL"
 
     let wallpapersSupported: Bool
     let onOpenSettings: () -> Void
     let onOpenLogs: () -> Void
 
+    private var allowedGames: [String] {
+        UserDefaults.standard.stringArray(forKey: "license_allowed_games") ?? ["ALL"]
+    }
+
+    private var filteredPackages: [RepositoryPackageRecord] {
+        let allPkgs = repositoryStore.packages
+        return allPkgs.filter { record in
+            let name = record.package.name.uppercased()
+            let summary = record.package.summary.uppercased()
+            let tags = record.package.tags.map { $0.uppercased() }
+            let category = record.package.category.uppercased()
+
+            // 1. License Key Tier Filter
+            if !allowedGames.contains("ALL") {
+                var matchesLicense = false
+                if allowedGames.contains("MLBB") && (name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB")) {
+                    matchesLicense = true
+                }
+                if allowedGames.contains("FFTH") && (name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH")) {
+                    matchesLicense = true
+                }
+                if allowedGames.contains("FFM") && (name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX")) {
+                    matchesLicense = true
+                }
+                if !matchesLicense { return false }
+            }
+
+            // 2. Selected UI Game Category Filter
+            if selectedGameFilter == "MLBB" {
+                return name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB")
+            } else if selectedGameFilter == "FFTH" {
+                return name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH")
+            } else if selectedGameFilter == "FFM" {
+                return name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX")
+            }
+
+            return true
+        }
+    }
+
     private var featuredPackages: [RepositoryPackageRecord] {
-        repositoryStore.packages.filter(\.package.isFeatured)
+        filteredPackages.filter(\.package.isFeatured)
     }
 
     private var regularPackages: [RepositoryPackageRecord] {
         let featuredIDs = Set(featuredPackages.map(\.id))
-        return repositoryStore.packages.filter { !featuredIDs.contains($0.id) }
+        return filteredPackages.filter { !featuredIDs.contains($0.id) }
     }
 
     var body: some View {
         NavigationStack {
             List {
+                gameCategoryBar
                 builtInToolsSection
 
                 if repositoryStore.packages.isEmpty {
@@ -70,6 +112,47 @@ struct LegacyRepositoryExploreView: View {
                 RepositoryPackageDetailView(record: record)
             }
         }
+    }
+
+    private var gameCategoryBar: some View {
+        Section {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    categoryChip(id: "ALL", title: "🌐 ទាំងអស់")
+                    if allowedGames.contains("ALL") || allowedGames.contains("MLBB") {
+                        categoryChip(id: "MLBB", title: "⚔️ MLBB")
+                    }
+                    if allowedGames.contains("ALL") || allowedGames.contains("FFTH") {
+                        categoryChip(id: "FFTH", title: "🔥 FFTH")
+                    }
+                    if allowedGames.contains("ALL") || allowedGames.contains("FFM") {
+                        categoryChip(id: "FFM", title: "⚡ FFM")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("ប្រភេទហ្គេម / GAME CATEGORIES")
+                .font(.caption.weight(.bold))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func categoryChip(id: String, title: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedGameFilter = id
+            }
+        } label: {
+            Text(title)
+                .font(.caption.weight(.bold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(selectedGameFilter == id ? AppTheme.accent : Color(uiColor: .tertiarySystemFill))
+                .foregroundColor(selectedGameFilter == id ? .white : .primary)
+                .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
     }
 
     private var builtInToolsSection: some View {
@@ -432,6 +515,10 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
+                    if let count = record.package.downloads, count > 0 {
+                        let formatted = count >= 1_000_000 ? String(format: "%.1fM", Double(count)/1_000_000.0) : (count >= 1_000 ? String(format: "%.1fk", Double(count)/1_000.0) : "\(count)")
+                        metadataBadge("\(formatted) Downloads", systemImage: "arrow.down.circle.fill")
+                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -445,6 +532,10 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
+                    if let count = record.package.downloads, count > 0 {
+                        let formatted = count >= 1_000_000 ? String(format: "%.1fM", Double(count)/1_000_000.0) : (count >= 1_000 ? String(format: "%.1fk", Double(count)/1_000.0) : "\(count)")
+                        metadataBadge("\(formatted) Downloads", systemImage: "arrow.down.circle.fill")
+                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -780,25 +871,72 @@ struct RepositoryPackageRow: View {
     @Environment(\.appLanguage) private var language
     let record: RepositoryPackageRecord
 
+    private var gameBadge: (text: String, color: Color)? {
+        let name = record.package.name.uppercased()
+        let summary = record.package.summary.uppercased()
+        let tags = record.package.tags.map { $0.uppercased() }
+        let category = record.package.category.uppercased()
+
+        if name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH") {
+            return ("🔥 FFTH", .red)
+        } else if name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX") {
+            return ("⚡ FFM", .orange)
+        } else if name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB") {
+            return ("⚔️ MLBB", .blue)
+        }
+        return nil
+    }
+
+    private var formattedDownloads: String? {
+        guard let count = record.package.downloads, count > 0 else { return nil }
+        if count >= 1_000_000 {
+            return String(format: "⬇️ %.1fM", Double(count) / 1_000_000.0)
+        } else if count >= 1_000 {
+            return String(format: "⬇️ %.1fk", Double(count) / 1_000.0)
+        } else {
+            return "⬇️ \(count)"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             RepositoryPackageIcon(package: record.package, size: 40)
             VStack(alignment: .leading, spacing: 3) {
-                Text(record.package.name)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Text(record.package.name)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    if let badge = gameBadge {
+                        Text(badge.text)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(badge.color.opacity(0.18), in: Capsule())
+                            .foregroundColor(badge.color)
+                    }
+                }
                 Text(record.package.summary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Text(language.text(
-                    "repository.by_version",
-                    record.package.author,
-                    record.package.version
-                ))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                HStack(spacing: 6) {
+                    Text(language.text(
+                        "repository.by_version",
+                        record.package.author,
+                        record.package.version
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    if let dl = formattedDownloads {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(dl)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                }
             }
         }
         .padding(.vertical, 4)

@@ -68,6 +68,7 @@ struct PackageRepositoryPackageDocument: Decodable {
     let download: String
     let sha256: String?
     let size: UInt64?
+    let downloads: Int?
     let supportedOS: [PackageOSRange]
     let changelog: String?
     let featured: Bool?
@@ -114,6 +115,7 @@ struct RepositoryPackage: Identifiable, Hashable {
     let downloadURL: URL
     let sha256: String?
     let expectedSize: UInt64?
+    let downloads: Int?
     let supportedOS: [PackageOSRange]
     let changelog: String?
     let isFeatured: Bool
@@ -436,6 +438,7 @@ enum PackageRepositoryValidator {
             downloadURL: downloadURL,
             sha256: package.sha256?.lowercased(),
             expectedSize: package.size,
+            downloads: package.downloads,
             supportedOS: package.supportedOS,
             changelog: trimmedOptional(package.changelog),
             isFeatured: package.featured ?? false,

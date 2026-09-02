@@ -35,6 +35,9 @@ struct RepositoryHomeView: View {
             .navigationTitle("3105")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    VIPLicenseCountdownBadge()
+                }
                 AppUtilityToolbar(
                     language: language,
                     onOpenSettings: onOpenSettings,

@@ -34,9 +34,10 @@ final class PackageRepositoryStore: ObservableObject {
         } else {
             resolutionIndex = RepositoryPackageResolutionIndex()
         }
-        let defaultRepo1 = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
-        let defaultRepo2 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!)
-        sources = [defaultRepo1, defaultRepo2]
+        let defaultRepo1 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-6sbz.onrender.com/repo.json")!)
+        let defaultRepo2 = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
+        let defaultRepo3 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!)
+        sources = [defaultRepo1, defaultRepo2, defaultRepo3]
         persist()
         for source in sources {
             sourceStates[source.id] = .idle
@@ -95,10 +96,11 @@ final class PackageRepositoryStore: ObservableObject {
     @discardableResult
     func addSource(rawURL: String) -> Bool {
         do {
-            let allowedURL1 = "https://server-key-3105.onrender.com/repo.json"
-            let allowedURL2 = "https://server-key-3105-oiaa.onrender.com/repo.json"
+            let allowedURL1 = "https://server-key-3105-6sbz.onrender.com/repo.json"
+            let allowedURL2 = "https://server-key-3105.onrender.com/repo.json"
+            let allowedURL3 = "https://server-key-3105-oiaa.onrender.com/repo.json"
             let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.caseInsensitiveCompare(allowedURL1) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL2) == .orderedSame else {
+            guard trimmed.caseInsensitiveCompare(allowedURL1) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL2) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL3) == .orderedSame else {
                 throw PackageRepositoryError.insecureURL
             }
             guard !sources.contains(where: {
@@ -491,6 +493,7 @@ private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskD
 enum PackageRepositoryNetworkClient {
     static func loadSourceCatalog(from catalogURL: URL) async throws -> [URL] {
         return [
+            URL(string: "https://server-key-3105-6sbz.onrender.com/repo.json")!,
             URL(string: "https://server-key-3105.onrender.com/repo.json")!,
             URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!
         ]

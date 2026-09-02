@@ -123,3 +123,71 @@ struct AppLogo: View {
         .accessibilityHidden(true)
     }
 }
+
+struct VIPLicenseCountdownBadge: View {
+    @AppStorage("license_expires_at") private var expiresAtString: String = "lifetime"
+    @State private var timeRemainingString: String = "VIP Lifetime"
+    @State private var isExpired: Bool = false
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: isExpired ? "clock.badge.exclamationmark.fill" : "key.fill")
+                .font(.system(size: 10, weight: .bold))
+            Text(timeRemainingString)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(isExpired ? Color.red.opacity(0.18) : AppTheme.accent.opacity(0.18))
+        )
+        .foregroundStyle(isExpired ? Color.red : AppTheme.accent)
+        .onAppear { updateCountdown() }
+        .onReceive(timer) { _ in updateCountdown() }
+    }
+
+    private func updateCountdown() {
+        if expiresAtString == "lifetime" || expiresAtString.isEmpty {
+            timeRemainingString = "VIP Lifetime"
+            isExpired = false
+            return
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var targetDate = formatter.date(from: expiresAtString)
+        if targetDate == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            targetDate = formatter.date(from: expiresAtString)
+        }
+
+        guard let expiresDate = targetDate else {
+            timeRemainingString = "VIP Lifetime"
+            isExpired = false
+            return
+        }
+
+        let diff = expiresDate.timeIntervalSince(Date())
+        if diff <= 0 {
+            timeRemainingString = "Expired"
+            isExpired = true
+        } else {
+            isExpired = false
+            let hours = Int(diff) / 3600
+            let minutes = (Int(diff) % 3600) / 60
+            let seconds = Int(diff) % 60
+            if hours >= 24 {
+                let days = hours / 24
+                let remainingHours = hours % 24
+                timeRemainingString = "សល់ \(days)ថ្ងៃ \(remainingHours)ម៉ោង"
+            } else if hours > 0 {
+                timeRemainingString = "សល់ \(hours)ម៉ោង \(minutes)នាទី"
+            } else {
+                timeRemainingString = String(format: "សល់ %02d:%02d", minutes, seconds)
+            }
+        }
+    }
+}
+

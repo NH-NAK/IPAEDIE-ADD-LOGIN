@@ -10,6 +10,7 @@ struct CyberLoginView: View {
     @Binding var attempts: Int
     @Binding var isLockedOut: Bool
     let onForcedUpdateRequired: (String) -> Void
+    let onNoInternetOrServerDown: () -> Void
     
     var body: some View {
         ZStack {
@@ -71,6 +72,7 @@ struct CyberLoginView: View {
     
     private func verifyKeyOnline(key: String, completion: @escaping (Bool, String?) -> Void) {
         let urls = [
+            "https://server-key-3105-6sbz.onrender.com/api/keys/verify",
             "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
             "https://server-key-3105.onrender.com/api/keys/verify"
         ]
@@ -78,6 +80,9 @@ struct CyberLoginView: View {
         func tryUrl(index: Int) {
             guard index < urls.count else {
                 completion(false, "CONNECTION FAILED")
+                DispatchQueue.main.async {
+                    onNoInternetOrServerDown()
+                }
                 return
             }
             guard let url = URL(string: urls[index]) else {
@@ -89,7 +94,7 @@ struct CyberLoginView: View {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2"
             let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -130,6 +135,17 @@ struct CyberLoginView: View {
                 if valid {
                     if let downloadToken = downloadToken {
                         UserDefaults.standard.set(downloadToken, forKey: "download_token")
+                    }
+                    if let keyType = json["keyType"] as? String {
+                        UserDefaults.standard.set(keyType, forKey: "license_key_type")
+                    }
+                    if let allowedGames = json["allowedGames"] as? [String] {
+                        UserDefaults.standard.set(allowedGames, forKey: "license_allowed_games")
+                    }
+                    if let expiresAt = json["expiresAt"] as? String {
+                        UserDefaults.standard.set(expiresAt, forKey: "license_expires_at")
+                    } else {
+                        UserDefaults.standard.set("lifetime", forKey: "license_expires_at")
                     }
                     completion(true, message)
                 } else {
@@ -193,14 +209,41 @@ struct ThreeOneOSFiveApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    // --- Passcode Login state ---
+    // --- Passcode Login & Announcement state ---
     @State private var isUnlocked = UserDefaults.standard.bool(forKey: "is_license_verified")
     @State private var passcode = ""
     @State private var loginMessage = "សូមបញ្ចូល KEY សម្រាប់ចូលប្រើប្រាស់"
     @State private var attempts = 0
     @State private var isLockedOut = false
+    @State private var activeAnnouncement: AnnouncementItem? = nil
     private let licenseCheckTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     // ----------------------------
+
+    private func showNoInternetAndExitAlert(message: String = "គ្មានការតភ្ជាប់អ៊ីនធឺណិត ឬ Server ឈប់ដំណើរការ!") {
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: "គ្មាន INTERNET",
+                message: message,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "ចាកចេញពី App (OK)", style: .destructive) { _ in
+                exit(0)
+            })
+            
+            if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = scene.windows.first {
+                var topVC = window.rootViewController
+                while let presented = topVC?.presentedViewController {
+                    topVC = presented
+                }
+                topVC?.present(alert, animated: true, completion: nil)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    exit(0)
+                }
+            }
+        }
+    }
 
     private func showForcedUpdateAlert(message: String) {
         DispatchQueue.main.async {
@@ -230,15 +273,19 @@ struct ThreeOneOSFiveApp: App {
 
     private func verifyLicenseInBackground() {
         let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
-        guard !key.isEmpty else { return }
         
         let urls = [
+            "https://server-key-3105-6sbz.onrender.com/api/keys/verify",
             "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
             "https://server-key-3105.onrender.com/api/keys/verify"
         ]
         
         func tryUrl(index: Int) {
-            guard index < urls.count else { return }
+            guard index < urls.count else {
+                // Connection failed for all servers (No internet connection or Server down)
+                self.showNoInternetAndExitAlert(message: "គ្មានការតភ្ជាប់អ៊ីនធឺណិត ឬ Server ឈប់ដំណើរការ!")
+                return
+            }
             guard let url = URL(string: urls[index]) else {
                 tryUrl(index: index + 1)
                 return
@@ -246,10 +293,11 @@ struct ThreeOneOSFiveApp: App {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 8.0
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.1"
-            let body = ["key": key, "deviceId": deviceId, "version": appVersion]
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2"
+            let body = ["key": key.isEmpty ? "PING_CHECK" : key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
                 return
@@ -279,6 +327,11 @@ struct ThreeOneOSFiveApp: App {
                     return
                 }
                 
+                guard !key.isEmpty else {
+                    // Launch ping check passed
+                    return
+                }
+                
                 guard let valid = json["valid"] as? Bool else {
                     tryUrl(index: index + 1)
                     return
@@ -291,16 +344,25 @@ struct ThreeOneOSFiveApp: App {
                         if let downloadToken = json["downloadToken"] as? String {
                             UserDefaults.standard.set(downloadToken, forKey: "download_token")
                         }
+                        if let expiresAt = json["expiresAt"] as? String {
+                            UserDefaults.standard.set(expiresAt, forKey: "license_expires_at")
+                        } else {
+                            UserDefaults.standard.set("lifetime", forKey: "license_expires_at")
+                        }
                     } else {
                         if index + 1 < urls.count {
                             tryUrl(index: index + 1)
                         } else {
+                            // LICENSE EXPIRED OR DEACTIVATED!
+                            // Auto restore all applied MOD patches back to original files!
+                            try? DevicePatchService.restoreAllAppliedPatches()
+                            
                             self.isUnlocked = false
                             UserDefaults.standard.set(false, forKey: "is_license_verified")
                             UserDefaults.standard.set("", forKey: "saved_license_key")
                             UserDefaults.standard.set("", forKey: "download_token")
                             self.passcode = ""
-                            self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENSE DEACTIVATED"
+                            self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENCE KEY អស់សុពលភាព - ឯកសារដើមត្រូវបាន RESTORE AUTO"
                         }
                     }
                 }
@@ -370,7 +432,10 @@ struct ThreeOneOSFiveApp: App {
                         isUnlocked: $isUnlocked,
                         attempts: $attempts,
                         isLockedOut: $isLockedOut,
-                        onForcedUpdateRequired: showForcedUpdateAlert
+                        onForcedUpdateRequired: showForcedUpdateAlert,
+                        onNoInternetOrServerDown: {
+                            showNoInternetAndExitAlert(message: "គ្មានការតភ្ជាប់អ៊ីនធឺណិត ឬ Server ឈប់ដំណើរការ!")
+                        }
                     )
                 }
             }
@@ -396,13 +461,13 @@ struct ThreeOneOSFiveApp: App {
                     checkForUpdate()
                 }
                 verifyLicenseInBackground()
+                fetchAnnouncementConfig()
             }
             .onChange(of: scenePhase) { phase in
                 if phase == .active, !showOnboarding {
                     appState.detectSupport()
                     verifyLicenseInBackground()
-                } else if (phase == .background || phase == .inactive) && autoRestoreOnExit {
-                    try? DevicePatchService.restoreAllAppliedPatches()
+                    fetchAnnouncementConfig()
                 }
             }
             .onOpenURL { url in
@@ -420,6 +485,118 @@ struct ThreeOneOSFiveApp: App {
                     try? DevicePatchService.restoreAllAppliedPatches()
                 }
             }
+            .overlay {
+                if let ann = activeAnnouncement {
+                    CyberAnnouncementView(item: ann) {
+                        UserDefaults.standard.set(ann.id, forKey: "last_dismissed_announcement_id")
+                        withAnimation {
+                            self.activeAnnouncement = nil
+                        }
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+            }
+        }
+    }
+
+    private func fetchAnnouncementConfig() {
+        let urls = [
+            "https://server-key-3105-6sbz.onrender.com/api/config",
+            "https://server-key-3105-oiaa.onrender.com/api/config",
+            "https://server-key-3105.onrender.com/api/config"
+        ]
+        
+        func tryConfig(index: Int) {
+            guard index < urls.count else { return }
+            guard let url = URL(string: urls[index]) else {
+                tryConfig(index: index + 1)
+                return
+            }
+            URLSession.shared.dataTask(with: url) { data, response, _ in
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                    tryConfig(index: index + 1)
+                    return
+                }
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    tryConfig(index: index + 1)
+                    return
+                }
+                
+                let enabled = json["announcement_enabled"] as? String ?? "false"
+                let title = json["announcement_title"] as? String ?? "📢 ប្រកាសព័ត៌មានអាប់ដេត"
+                let message = json["announcement_message"] as? String ?? ""
+                let annId = json["announcement_id"] as? String ?? "1"
+                
+                if enabled == "true" && !message.isEmpty {
+                    let lastDismissed = UserDefaults.standard.string(forKey: "last_dismissed_announcement_id")
+                    if lastDismissed != annId {
+                        DispatchQueue.main.async {
+                            withAnimation {
+                                self.activeAnnouncement = AnnouncementItem(id: annId, title: title, message: message)
+                            }
+                        }
+                    }
+                }
+            }.resume()
+        }
+        
+        tryConfig(index: 0)
+    }
+}
+
+struct AnnouncementItem: Identifiable {
+    let id: String
+    let title: String
+    let message: String
+}
+
+struct CyberAnnouncementView: View {
+    let item: AnnouncementItem
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.85).ignoresSafeArea()
+            
+            VStack(spacing: 18) {
+                Image(systemName: "megaphone.fill")
+                    .font(.system(size: 45))
+                    .foregroundStyle(.yellow)
+                    .shadow(color: .yellow.opacity(0.5), radius: 8)
+                    .padding(.top, 8)
+                
+                Text(item.title)
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                
+                Text(item.message)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+                
+                Button(action: onDismiss) {
+                    Text("យល់ព្រម / OK")
+                        .font(.headline.weight(.bold))
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.yellow)
+                        .cornerRadius(12)
+                }
+                .padding(.top, 8)
+            }
+            .padding(24)
+            .background(Color(red: 0.08, green: 0.10, blue: 0.18))
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.yellow.opacity(0.5), lineWidth: 1.5)
+            )
+            .padding(.horizontal, 28)
+            .shadow(color: .yellow.opacity(0.25), radius: 20)
         }
     }
 }

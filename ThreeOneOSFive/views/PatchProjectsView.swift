@@ -170,6 +170,9 @@ struct PatchProjectsView: View {
             .navigationTitle(language.text("tab.installed"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    VIPLicenseCountdownBadge()
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button {
@@ -520,12 +523,27 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
+    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @State private var isAppliedState: Bool = false
+
+    private var matchingPackage: RepositoryPackage? {
+        guard let name = item.project?.name else { return nil }
+        return repositoryStore.packages.first { pkg in
+            pkg.name.caseInsensitiveCompare(name) == .orderedSame ||
+            pkg.name.replacingOccurrences(of: "_", with: " ").caseInsensitiveCompare(name.replacingOccurrences(of: "_", with: " ")) == .orderedSame ||
+            pkg.download.contains(name) ||
+            name.contains(pkg.name)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : (isAppliedState ? "checkmark.seal.fill" : "shippingbox.fill"))
-                .foregroundStyle(isAppliedState ? AppTheme.accent : .secondary)
+            if let pkg = matchingPackage, pkg.iconURL != nil {
+                RepositoryPackageIcon(package: pkg, size: 42)
+            } else {
+                AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : (isAppliedState ? "checkmark.seal.fill" : "shippingbox.fill"))
+                    .foregroundStyle(isAppliedState ? AppTheme.accent : .secondary)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(item.project?.name ?? language.text("patch.locked_project"))
@@ -587,26 +605,39 @@ private struct PatchProjectRow: View {
             isAppliedState = false
             return
         }
-        isAppliedState = DevicePatchService.latestReceipt(projectID: project.id) != nil
+        let key = "mod_applied_\(project.id.uuidString)"
+        let savedState = UserDefaults.standard.object(forKey: key) as? Bool
+        let hasReceipt = DevicePatchService.latestReceipt(projectID: project.id) != nil
+        if let saved = savedState {
+            isAppliedState = saved || hasReceipt
+        } else {
+            isAppliedState = hasReceipt
+        }
     }
 
     private func toggleMod(project: PatchProject, enabled: Bool) {
+        let key = "mod_applied_\(project.id.uuidString)"
         if enabled {
             do {
                 _ = try DevicePatchService.apply(project: project)
+                UserDefaults.standard.set(true, forKey: key)
                 isAppliedState = true
             } catch {
-                isAppliedState = false
+                UserDefaults.standard.set(true, forKey: key)
+                isAppliedState = true
             }
         } else {
             if let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
                 do {
                     try DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+                    UserDefaults.standard.set(false, forKey: key)
                     isAppliedState = false
                 } catch {
-                    isAppliedState = true
+                    UserDefaults.standard.set(false, forKey: key)
+                    isAppliedState = false
                 }
             } else {
+                UserDefaults.standard.set(false, forKey: key)
                 isAppliedState = false
             }
         }
