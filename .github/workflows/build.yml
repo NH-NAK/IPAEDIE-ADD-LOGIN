@@ -7,15 +7,14 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-13
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set up Xcode Version
+    - name: Print Xcode Version
       run: |
-        sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
         xcodebuild -version
 
     - name: Build Target
