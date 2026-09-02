@@ -519,12 +519,28 @@ struct ThreeOneOSFiveApp: App {
                     return
                 }
                 
-                let enabled = json["announcement_enabled"] as? String ?? "false"
+                let enabledBool: Bool
+                if let b = json["announcement_enabled"] as? Bool {
+                    enabledBool = b
+                } else if let s = json["announcement_enabled"] as? String {
+                    enabledBool = (s.lowercased() == "true")
+                } else {
+                    enabledBool = false
+                }
+                
                 let title = json["announcement_title"] as? String ?? "📢 ប្រកាសព័ត៌មានអាប់ដេត"
                 let message = json["announcement_message"] as? String ?? ""
-                let annId = json["announcement_id"] as? String ?? "1"
                 
-                if enabled == "true" && !message.isEmpty {
+                let annId: String
+                if let idNum = json["announcement_id"] as? Int {
+                    annId = String(idNum)
+                } else if let idStr = json["announcement_id"] as? String {
+                    annId = idStr
+                } else {
+                    annId = "1"
+                }
+                
+                if enabledBool && !message.isEmpty {
                     let lastDismissed = UserDefaults.standard.string(forKey: "last_dismissed_announcement_id")
                     if lastDismissed != annId {
                         DispatchQueue.main.async {
