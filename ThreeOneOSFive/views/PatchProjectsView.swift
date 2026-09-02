@@ -529,9 +529,10 @@ private struct PatchProjectRow: View {
     private var matchingPackage: RepositoryPackage? {
         guard let name = item.project?.name else { return nil }
         let cleanName = name.replacingOccurrences(of: "_", with: " ").lowercased()
-        for pkg in repositoryStore.packages {
+        for record in repositoryStore.allPackages {
+            let pkg = record.package
             let pkgName = pkg.name.replacingOccurrences(of: "_", with: " ").lowercased()
-            if pkgName == cleanName || pkg.download.lowercased().contains(cleanName) || cleanName.contains(pkgName) {
+            if pkgName == cleanName || pkg.downloadURL.absoluteString.lowercased().contains(cleanName) || cleanName.contains(pkgName) {
                 return pkg
             }
         }

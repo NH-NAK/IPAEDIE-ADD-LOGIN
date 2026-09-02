@@ -22,7 +22,7 @@ struct LegacyRepositoryExploreView: View {
             let name = record.package.name.uppercased()
             let summary = record.package.summary.uppercased()
             let tags = record.package.tags.map { $0.uppercased() }
-            let category = record.package.category.uppercased()
+            let category = record.package.category?.uppercased() ?? ""
 
             // 1. License Key Tier Filter
             if !allowedGames.contains("ALL") {
@@ -875,7 +875,7 @@ struct RepositoryPackageRow: View {
         let name = record.package.name.uppercased()
         let summary = record.package.summary.uppercased()
         let tags = record.package.tags.map { $0.uppercased() }
-        let category = record.package.category.uppercased()
+        let category = record.package.category?.uppercased() ?? ""
 
         if name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH") {
             return ("🔥 FFTH", .red)
