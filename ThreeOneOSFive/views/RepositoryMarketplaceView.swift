@@ -13,11 +13,17 @@ struct LegacyRepositoryExploreView: View {
     let onOpenLogs: () -> Void
 
     private var allowedGames: [String] {
-        UserDefaults.standard.stringArray(forKey: "license_allowed_games") ?? ["ALL"]
+        let keyType = UserDefaults.standard.string(forKey: "license_key_type") ?? "VIP_ALL"
+        if keyType == "FF_ONLY" { return ["FFTH", "FFM"] }
+        if keyType == "MLBB_ONLY" { return ["MLBB"] }
+        if keyType == "FFTH_ONLY" { return ["FFTH"] }
+        if keyType == "FFM_ONLY" { return ["FFM"] }
+        return UserDefaults.standard.stringArray(forKey: "license_allowed_games") ?? ["ALL"]
     }
 
     private var filteredPackages: [RepositoryPackageRecord] {
         let allPkgs = repositoryStore.packages
+        let currentAllowed = allowedGames
         return allPkgs.filter { record in
             let name = record.package.name.uppercased()
             let summary = record.package.summary.uppercased()
@@ -25,15 +31,15 @@ struct LegacyRepositoryExploreView: View {
             let category = record.package.category?.uppercased() ?? ""
 
             // 1. License Key Tier Filter
-            if !allowedGames.contains("ALL") {
+            if !currentAllowed.contains("ALL") && !currentAllowed.contains("VIP_ALL") {
                 var matchesLicense = false
-                if allowedGames.contains("MLBB") && (name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category.contains("MLBB")) {
+                if currentAllowed.contains("MLBB") && (name.contains("MLBB") || summary.contains("MLBB") || tags.contains("MLBB") || category == "MLBB") {
                     matchesLicense = true
                 }
-                if allowedGames.contains("FFTH") && (name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category.contains("FFTH")) {
+                if currentAllowed.contains("FFTH") && (name.contains("FFTH") || summary.contains("FFTH") || tags.contains("FFTH") || category == "FFTH") {
                     matchesLicense = true
                 }
-                if allowedGames.contains("FFM") && (name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category.contains("FFM") || summary.contains("FREE FIRE MAX")) {
+                if currentAllowed.contains("FFM") && (name.contains("FFM") || summary.contains("FFM") || tags.contains("FFM") || category == "FFM" || summary.contains("FREE FIRE MAX")) {
                     matchesLicense = true
                 }
                 if !matchesLicense { return false }
@@ -515,10 +521,6 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
-                    if let count = record.package.downloads, count > 0 {
-                        let formatted = count >= 1_000_000 ? String(format: "%.1fM", Double(count)/1_000_000.0) : (count >= 1_000 ? String(format: "%.1fk", Double(count)/1_000.0) : "\(count)")
-                        metadataBadge("\(formatted) Downloads", systemImage: "arrow.down.circle.fill")
-                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -532,10 +534,6 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
-                    if let count = record.package.downloads, count > 0 {
-                        let formatted = count >= 1_000_000 ? String(format: "%.1fM", Double(count)/1_000_000.0) : (count >= 1_000 ? String(format: "%.1fk", Double(count)/1_000.0) : "\(count)")
-                        metadataBadge("\(formatted) Downloads", systemImage: "arrow.down.circle.fill")
-                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -928,14 +926,6 @@ struct RepositoryPackageRow: View {
                     ))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                    if let dl = formattedDownloads {
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Text(dl)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(AppTheme.accent)
-                    }
                 }
             }
         }

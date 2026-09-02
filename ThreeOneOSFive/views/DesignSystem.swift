@@ -162,6 +162,18 @@ struct VIPLicenseCountdownBadge: View {
             formatter.formatOptions = [.withInternetDateTime]
             targetDate = formatter.date(from: expiresAtString)
         }
+        if targetDate == nil {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            targetDate = df.date(from: expiresAtString)
+        }
+        if targetDate == nil {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            targetDate = df.date(from: expiresAtString)
+        }
 
         guard let expiresDate = targetDate else {
             timeRemainingString = "VIP Lifetime"

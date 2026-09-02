@@ -350,20 +350,16 @@ struct ThreeOneOSFiveApp: App {
                             UserDefaults.standard.set("lifetime", forKey: "license_expires_at")
                         }
                     } else {
-                        if index + 1 < urls.count {
-                            tryUrl(index: index + 1)
-                        } else {
-                            // LICENSE EXPIRED OR DEACTIVATED!
-                            // Auto restore all applied MOD patches back to original files!
-                            try? DevicePatchService.restoreAllAppliedPatches()
-                            
-                            self.isUnlocked = false
-                            UserDefaults.standard.set(false, forKey: "is_license_verified")
-                            UserDefaults.standard.set("", forKey: "saved_license_key")
-                            UserDefaults.standard.set("", forKey: "download_token")
-                            self.passcode = ""
-                            self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENCE KEY អស់សុពលភាព - ឯកសារដើមត្រូវបាន RESTORE AUTO"
-                        }
+                        // LICENSE EXPIRED OR DEACTIVATED!
+                        // Auto restore all applied MOD patches back to original files!
+                        _ = try? DevicePatchService.restoreAllAppliedPatches()
+                        
+                        self.isUnlocked = false
+                        UserDefaults.standard.set(false, forKey: "is_license_verified")
+                        UserDefaults.standard.set("", forKey: "saved_license_key")
+                        UserDefaults.standard.set("", forKey: "download_token")
+                        self.passcode = ""
+                        self.loginMessage = (json["message"] as? String)?.uppercased() ?? "LICENCE KEY អស់សុពលភាព - ឯកសារដើមត្រូវបាន RESTORE AUTO"
                     }
                 }
             }
@@ -482,7 +478,7 @@ struct ThreeOneOSFiveApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                 if autoRestoreOnExit {
-                    try? DevicePatchService.restoreAllAppliedPatches()
+                    _ = try? DevicePatchService.restoreAllAppliedPatches()
                 }
             }
             .overlay {
