@@ -72,23 +72,7 @@ struct LegacyRepositoryExploreView: View {
             List {
                 gameCategoryBar
                 builtInToolsSection
-
-                if repositoryStore.packages.isEmpty {
-                    marketplaceEmptySection
-                } else {
-                    if !featuredPackages.isEmpty {
-                        packageSection(
-                            titleKey: "repository.featured",
-                            packages: featuredPackages
-                        )
-                    }
-                    if !regularPackages.isEmpty {
-                        packageSection(
-                            titleKey: "repository.all_packages",
-                            packages: regularPackages
-                        )
-                    }
-                }
+                contentSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle(language.text("repository.explore"))
@@ -121,6 +105,24 @@ struct LegacyRepositoryExploreView: View {
             }
             .navigationDestination(for: RepositoryPackageRecord.self) { record in
                 RepositoryPackageDetailView(record: record)
+            }
+        }
+    @ViewBuilder
+    private var contentSection: some View {
+        if repositoryStore.packages.isEmpty {
+            marketplaceEmptySection
+        } else {
+            if !featuredPackages.isEmpty {
+                packageSection(
+                    titleKey: "repository.featured",
+                    packages: featuredPackages
+                )
+            }
+            if !regularPackages.isEmpty {
+                packageSection(
+                    titleKey: "repository.all_packages",
+                    packages: regularPackages
+                )
             }
         }
     }
