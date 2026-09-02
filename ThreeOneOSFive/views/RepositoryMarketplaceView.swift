@@ -107,6 +107,8 @@ struct LegacyRepositoryExploreView: View {
                 RepositoryPackageDetailView(record: record)
             }
         }
+    }
+
     @ViewBuilder
     private var contentSection: some View {
         if repositoryStore.packages.isEmpty {
