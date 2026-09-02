@@ -116,6 +116,24 @@ struct LegacyRepositoryExploreView: View {
         }
     }
 
+    @ToolbarContentBuilder
+    private var toolbarLeading: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            VIPLicenseCountdownBadge()
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarTrailing: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            AppUtilityToolbar(
+                language: language,
+                onOpenSettings: onOpenSettings,
+                onOpenLogs: onOpenLogs
+            )
+        }
+    }
+
     @ViewBuilder
     private var contentSection: some View {
         if repositoryStore.packages.isEmpty {
