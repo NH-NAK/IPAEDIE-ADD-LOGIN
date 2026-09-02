@@ -94,11 +94,16 @@ struct LegacyRepositoryExploreView: View {
             .navigationTitle(language.text("repository.explore"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                AppUtilityToolbar(
-                    language: language,
-                    onOpenSettings: onOpenSettings,
-                    onOpenLogs: onOpenLogs
-                )
+                ToolbarItem(placement: .navigationBarLeading) {
+                    VIPLicenseCountdownBadge()
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    AppUtilityToolbar(
+                        language: language,
+                        onOpenSettings: onOpenSettings,
+                        onOpenLogs: onOpenLogs
+                    )
+                }
             }
             .refreshable {
                 await repositoryStore.refreshAllAndWait()
