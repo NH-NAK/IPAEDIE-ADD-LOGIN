@@ -95,7 +95,7 @@ struct CyberLoginView: View {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.3"
             let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -298,7 +298,7 @@ struct ThreeOneOSFiveApp: App {
             request.timeoutInterval = 8.0
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.3"
             let body = ["key": key.isEmpty ? "PING_CHECK" : key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)

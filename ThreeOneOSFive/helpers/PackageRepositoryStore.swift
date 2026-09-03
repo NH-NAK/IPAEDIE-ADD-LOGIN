@@ -53,7 +53,7 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     var packages: [RepositoryPackageRecord] {
-        sources.flatMap { source -> [RepositoryPackageRecord] in
+        let all = sources.flatMap { source -> [RepositoryPackageRecord] in
             guard let repository = repositories[source.id] else {
                 return []
             }
@@ -66,6 +66,7 @@ final class PackageRepositoryStore: ObservableObject {
                 )
             }
         }
+        return PackageLicenseFilter.filter(all)
         .sorted {
             if $0.package.isFeatured != $1.package.isFeatured {
                 return $0.package.isFeatured && !$1.package.isFeatured
@@ -632,16 +633,18 @@ enum PackageRepositoryNetworkClient {
     ) async throws -> (fileURL: URL, finalURL: URL) {
         let validatedURL = try PackageRepositoryURLPolicy.validate(rawURL)
         
-        // Append downloadToken to request URL to verify app authenticity
+        // Append downloadToken and keyType to request URL
         var url = validatedURL
-        if let token = UserDefaults.standard.string(forKey: "download_token"), !token.isEmpty {
-            if var components = URLComponents(url: validatedURL, resolvingAgainstBaseURL: false) {
-                var queryItems = components.queryItems ?? []
+        if var components = URLComponents(url: validatedURL, resolvingAgainstBaseURL: false) {
+            var queryItems = components.queryItems ?? []
+            if let token = UserDefaults.standard.string(forKey: "download_token"), !token.isEmpty {
                 queryItems.append(URLQueryItem(name: "token", value: token))
-                components.queryItems = queryItems
-                if let newURL = components.url {
-                    url = newURL
-                }
+            }
+            let keyType = UserDefaults.standard.string(forKey: "license_key_type") ?? "VIP_ALL"
+            queryItems.append(URLQueryItem(name: "keyType", value: keyType))
+            components.queryItems = queryItems
+            if let newURL = components.url {
+                url = newURL
             }
         }
         

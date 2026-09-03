@@ -839,3 +839,89 @@ enum PackageDigest {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
+
+enum PackageLicenseFilter {
+    static var currentKeyType: String {
+        UserDefaults.standard.string(forKey: "license_key_type") ?? "VIP_ALL"
+    }
+
+    static var allowedGames: [String] {
+        let keyType = currentKeyType
+        if keyType == "FF_ONLY" { return ["FFTH", "FFM"] }
+        if keyType == "MLBB_ONLY" { return ["MLBB"] }
+        if keyType == "FFTH_ONLY" { return ["FFTH"] }
+        if keyType == "FFM_ONLY" { return ["FFM"] }
+        return UserDefaults.standard.stringArray(forKey: "license_allowed_games") ?? ["ALL"]
+    }
+
+    static func matches(_ record: RepositoryPackageRecord) -> Bool {
+        matches(record.package)
+    }
+
+    static func matches(_ package: RepositoryPackage) -> Bool {
+        let keyType = currentKeyType
+        if keyType == "VIP_ALL" || keyType == "ALL" {
+            return true
+        }
+
+        let name = package.name.uppercased()
+        let summary = package.summary.uppercased()
+        let details = (package.details ?? "").uppercased()
+        let category = (package.category ?? "").uppercased()
+        let tags = package.tags.map { $0.uppercased() }
+        let identifier = package.identifier.uppercased()
+        let downloadPath = package.downloadURL.absoluteString.uppercased()
+
+        let isMLBB = identifier.contains("MLBB") ||
+                     identifier.contains("GUSION") ||
+                     identifier.contains("LING") ||
+                     category.contains("MLBB") ||
+                     category.contains("COLLECTOR") ||
+                     tags.contains("MLBB") ||
+                     tags.contains("COLLECTOR") ||
+                     name.contains("MLBB") ||
+                     name.contains("GUSION") ||
+                     name.contains("LING") ||
+                     summary.contains("MLBB") ||
+                     summary.contains("MOBILE LEGENDS") ||
+                     details.contains("MOBILE LEGENDS") ||
+                     downloadPath.contains("MLBB")
+
+        let isFF = identifier.contains("FFTH") ||
+                   identifier.contains("FFM") ||
+                   identifier.contains("FREEFIRE") ||
+                   category.contains("FFTH") ||
+                   category.contains("FFM") ||
+                   tags.contains("FREE FIRE") ||
+                   tags.contains("FFTH") ||
+                   tags.contains("FFM") ||
+                   tags.contains("AIM DRAG") ||
+                   tags.contains("AIM NECK") ||
+                   name.contains("FFTH") ||
+                   name.contains("FFM") ||
+                   name.contains("FREE FIRE") ||
+                   summary.contains("FREE FIRE") ||
+                   summary.contains("FFTH") ||
+                   summary.contains("FFM") ||
+                   downloadPath.contains("FFTH") ||
+                   downloadPath.contains("FFM")
+
+        if keyType == "FF_ONLY" {
+            if isMLBB { return false }
+            return isFF || (!isMLBB)
+        } else if keyType == "MLBB_ONLY" {
+            if isFF { return false }
+            return isMLBB || (!isFF)
+        }
+
+        return true
+    }
+
+    static func filter(_ records: [RepositoryPackageRecord]) -> [RepositoryPackageRecord] {
+        records.filter { matches($0) }
+    }
+
+    static func filter(_ packages: [RepositoryPackage]) -> [RepositoryPackage] {
+        packages.filter { matches($0) }
+    }
+}

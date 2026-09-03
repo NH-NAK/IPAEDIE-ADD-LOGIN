@@ -131,28 +131,17 @@ struct SettingsView: View {
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
                         .cornerRadius(8)
 
-                        HStack(spacing: 10) {
-                            Button {
-                                if let url = URL(string: currentDNSProfile.installURL) {
-                                    UIApplication.shared.open(url)
-                                }
-                            } label: {
-                                Label("Install DNS", systemImage: "arrow.down.circle.fill")
-                                    .font(.subheadline.bold())
-                                    .frame(maxWidth: .infinity)
+                        Button {
+                            if let url = URL(string: currentDNSProfile.installURL) {
+                                UIApplication.shared.open(url)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.blue)
-
-                            Button {
-                                openSystemSettings()
-                            } label: {
-                                Label("Settings", systemImage: "gearshape.fill")
-                                    .font(.subheadline.bold())
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
+                        } label: {
+                            Label("Install DNS", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
                         .padding(.top, 2)
                     }
                     .padding(.vertical, 4)
@@ -210,47 +199,6 @@ struct SettingsView: View {
                     Text(language.text("settings.verified_versions"))
                 } footer: {
                     Text(language.text("settings.supported_versions_footer"))
-                }
-
-                Section(language.text("settings.social_media")) {
-                    creditsRow(
-                        name: "GitHub",
-                        role: language.text("social.github_role"),
-                        url: "https://github.com/YangJiiii/3105"
-                    )
-                    creditsRow(
-                        name: "Cộng Đồng IOSVN",
-                        role: language.text("social.iosvn_role"),
-                        url: "https://t.me/ioscrackvn"
-                    )
-                }
-
-                Section(language.text("settings.credits")) {
-                    creditsRow(
-                        name: "YangJiii",
-                        role: language.text("credit.yangjiii"),
-                        url: "https://x.com/duongduong0908"
-                    )
-                    creditsRow(
-                        name: "0xjohnnydev",
-                        role: language.text("credit.filzaslop"),
-                        url: "https://github.com/0xjohnnydev/FilzaSlop"
-                    )
-                    creditsRow(
-                        name: "LeminLimez",
-                        role: language.text("credit.pocket_poster"),
-                        url: "https://github.com/leminlimez/Pocket-Poster"
-                    )
-                    creditsRow(
-                        name: "CrazyMind90",
-                        role: language.text("credit.sandbox_escape"),
-                        url: "https://github.com/CrazyMind90"
-                    )
-                    creditsRow(
-                        name: "forcequitOS",
-                        role: language.text("credit.forcequit"),
-                        url: "https://github.com/forcequitOS"
-                    )
                 }
 
                 Section {
@@ -376,35 +324,6 @@ struct SettingsView: View {
         }
     }
 
-    private func openSystemSettings() {
-        let candidatePaths = [
-            "App-prefs:root=General&path=ManagedConfigurationList",
-            "App-prefs:root=General&path=VPN",
-            "App-prefs:root=General",
-            "App-prefs:root=ROOT",
-            "App-prefs:",
-            "prefs:root=General&path=ManagedConfigurationList",
-            "prefs:root=General",
-            "prefs:root=ROOT",
-            "prefs:"
-        ]
-        
-        func attemptOpen(index: Int) {
-            guard index < candidatePaths.count else { return }
-            guard let targetURL = URL(string: candidatePaths[index]) else {
-                attemptOpen(index: index + 1)
-                return
-            }
-            UIApplication.shared.open(targetURL, options: [:]) { success in
-                if !success {
-                    attemptOpen(index: index + 1)
-                }
-            }
-        }
-        
-        attemptOpen(index: 0)
-    }
-
     private func performRestore() {
         do {
             let count = try DevicePatchService.restoreAllAppliedPatches()
@@ -507,30 +426,5 @@ struct SettingsView: View {
             Int64(version.beta),
             version.build
         )
-    }
-
-    @ViewBuilder
-    private func creditsRow(name: String, role: String, url: String) -> some View {
-        if let destination = URL(string: url) {
-            Link(destination: destination) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(name)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text(role)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(AppTheme.accent)
-                        .frame(width: 28, height: 28)
-                }
-                .contentShape(Rectangle())
-            }
-            .accessibilityLabel(language.text("accessibility.open_profile", name))
-        }
     }
 }

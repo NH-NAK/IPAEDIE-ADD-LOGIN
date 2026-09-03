@@ -207,7 +207,7 @@ private struct RepositorySourceDetailView: View {
 
     private var records: [RepositoryPackageRecord] {
         guard let source, let repository else { return [] }
-        return repository.packages.map {
+        let all = repository.packages.map {
             RepositoryPackageRecord(
                 sourceID: source.id,
                 sourceName: repository.name,
@@ -215,10 +215,12 @@ private struct RepositorySourceDetailView: View {
                 package: $0
             )
         }
+        return PackageLicenseFilter.filter(all)
     }
 
     private var tagGroups: [RepositoryTagGroup] {
-        PackageRepositoryTagIndex.groups(for: repository?.packages ?? [])
+        let allowedPackages = PackageLicenseFilter.filter(repository?.packages ?? [])
+        return PackageRepositoryTagIndex.groups(for: allowedPackages)
     }
 
     var body: some View {
