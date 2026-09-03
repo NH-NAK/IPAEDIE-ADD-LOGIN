@@ -19,7 +19,14 @@
     <key>CFBundleShortVersionString</key>
     <string>2.2</string>
     <key>CFBundleVersion</key>
-    <string>7</string>
+    <string>8</string>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>App-prefs</string>
+        <string>App-Prefs</string>
+        <string>app-prefs</string>
+        <string>prefs</string>
+    </array>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

@@ -86,7 +86,7 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "shield.checkered")
                                 .font(.title3)
-                                .foregroundStyle(Color.green)
+                                .foregroundStyle(Color.blue)
                             Text(currentDNSProfile.title)
                                 .font(.headline)
                             Spacer()
@@ -94,15 +94,15 @@ struct SettingsView: View {
                                 .font(.caption.monospaced().bold())
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
-                                .background(Color.green.opacity(0.15))
-                                .foregroundStyle(Color.green)
+                                .background(Color.blue.opacity(0.15))
+                                .foregroundStyle(Color.blue)
                                 .clipShape(Capsule())
                         }
 
                         // Segmented Picker to choose between NH-TEAM VIP and Custom DNS
                         Picker("ជ្រើសរើស DNS", selection: $selectedDNS) {
-                            Text("NH-TEAM VIP (1686ae)").tag("nhteam")
-                            Text("Custom (1e1e38)").tag("custom")
+                            Text("💎 NH-TEAM VIP (1686ae)").tag("nhteam")
+                            Text("⚡ Custom (1e1e38)").tag("custom")
                         }
                         .pickerStyle(.segmented)
                         .padding(.vertical, 2)
@@ -142,18 +142,10 @@ struct SettingsView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(.green)
+                            .tint(.blue)
 
                             Button {
-                                if let url = URL(string: "App-Prefs:root=General&path=ManagedConfigurationList") {
-                                    if UIApplication.shared.canOpenURL(url) {
-                                        UIApplication.shared.open(url)
-                                    } else if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                                        UIApplication.shared.open(settingsURL)
-                                    }
-                                } else if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                                    UIApplication.shared.open(settingsURL)
-                                }
+                                openSystemSettings()
                             } label: {
                                 Label("Settings", systemImage: "gearshape.fill")
                                     .font(.subheadline.bold())
@@ -267,14 +259,14 @@ struct SettingsView: View {
                         HStack {
                             Label("KEY បច្ចុប្បន្ន", systemImage: "key.fill")
                                 .font(.headline)
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(.blue)
                             Spacer()
                             Text(licenseTypeDisplay)
                                 .font(.caption.bold())
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.yellow.opacity(0.15))
-                                .foregroundStyle(.yellow)
+                                .background(Color.blue.opacity(0.15))
+                                .foregroundStyle(.blue)
                                 .clipShape(Capsule())
                         }
 
@@ -307,12 +299,12 @@ struct SettingsView: View {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: licenseExpirationInfo.isExpired ? "exclamationmark.circle.fill" : (licenseExpirationInfo.isLifetime ? "infinity" : "clock.fill"))
                                 .font(.title3)
-                                .foregroundStyle(licenseExpirationInfo.isExpired ? Color.red : (licenseExpirationInfo.isLifetime ? Color.green : Color.orange))
+                                .foregroundStyle(licenseExpirationInfo.isExpired ? Color.red : (licenseExpirationInfo.isLifetime ? Color.blue : Color.cyan))
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(licenseExpirationInfo.text)
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(licenseExpirationInfo.isExpired ? Color.red : (licenseExpirationInfo.isLifetime ? Color.green : Color.orange))
+                                    .foregroundStyle(licenseExpirationInfo.isExpired ? Color.red : (licenseExpirationInfo.isLifetime ? Color.blue : Color.cyan))
                                 Text(licenseExpirationInfo.subText)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -382,6 +374,35 @@ struct SettingsView: View {
                 Text("តើអ្នកពិតជាចង់ចាកចេញពី Key បច្ចុប្បន្នមែនទេ? អ្នកនឹងត្រូវបញ្ចូល Key សាជាថ្មីដើម្បីចូលប្រើប្រាស់។")
             }
         }
+    }
+
+    private func openSystemSettings() {
+        let candidatePaths = [
+            "App-prefs:root=General&path=ManagedConfigurationList",
+            "App-prefs:root=General&path=VPN",
+            "App-prefs:root=General",
+            "App-prefs:root=ROOT",
+            "App-prefs:",
+            "prefs:root=General&path=ManagedConfigurationList",
+            "prefs:root=General",
+            "prefs:root=ROOT",
+            "prefs:"
+        ]
+        
+        func attemptOpen(index: Int) {
+            guard index < candidatePaths.count else { return }
+            guard let targetURL = URL(string: candidatePaths[index]) else {
+                attemptOpen(index: index + 1)
+                return
+            }
+            UIApplication.shared.open(targetURL, options: [:]) { success in
+                if !success {
+                    attemptOpen(index: index + 1)
+                }
+            }
+        }
+        
+        attemptOpen(index: 0)
     }
 
     private func performRestore() {

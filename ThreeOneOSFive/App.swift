@@ -25,16 +25,16 @@ struct CyberLoginView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 85, height: 85)
                         .cornerRadius(18)
-                        .shadow(color: .red.opacity(0.6), radius: 12)
+                        .shadow(color: .blue.opacity(0.8), radius: 15)
                     
-                    Text("សួស្ដីអ្នកទាំងអស់គ្នា")
+                    Text("💎 សួស្ដីអ្នកទាំងអស់គ្នា ⚡")
                         .font(.custom("Orbitron", size: 24))
                         .fontWeight(.black)
                         .foregroundColor(.white)
                     
                     Text(loginMessage)
                         .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.red.opacity(0.8))
+                        .foregroundColor(.blue.opacity(0.9))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -49,7 +49,7 @@ struct CyberLoginView: View {
                         .foregroundColor(.white)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                .stroke(Color.blue.opacity(0.5), lineWidth: 1.5)
                         )
                         .multilineTextAlignment(.center)
                         .autocorrectionDisabled()
@@ -592,8 +592,8 @@ struct CyberAnnouncementView: View {
             VStack(spacing: 18) {
                 Image(systemName: "megaphone.fill")
                     .font(.system(size: 45))
-                    .foregroundStyle(.yellow)
-                    .shadow(color: .yellow.opacity(0.5), radius: 8)
+                    .foregroundStyle(.blue)
+                    .shadow(color: .blue.opacity(0.6), radius: 8)
                     .padding(.top, 8)
                 
                 Text(item.title)
@@ -610,10 +610,10 @@ struct CyberAnnouncementView: View {
                 Button(action: onDismiss) {
                     Text("យល់ព្រម / OK")
                         .font(.headline.weight(.bold))
-                        .foregroundColor(.black)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.yellow)
+                        .background(Color.blue)
                         .cornerRadius(12)
                 }
                 .padding(.top, 8)
@@ -623,10 +623,10 @@ struct CyberAnnouncementView: View {
             .cornerRadius(20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.yellow.opacity(0.5), lineWidth: 1.5)
+                    .stroke(Color.blue.opacity(0.6), lineWidth: 1.5)
             )
             .padding(.horizontal, 28)
-            .shadow(color: .yellow.opacity(0.25), radius: 20)
+            .shadow(color: .blue.opacity(0.35), radius: 20)
         }
     }
 }

@@ -33,6 +33,10 @@ jobs:
       run: |
         mkdir -p Payload
         cp -r build/Release-iphoneos/3105.app Payload/3105.app
+        plutil -replace CFBundleDisplayName -string "NH-MOD IOS" Payload/3105.app/Info.plist
+        plutil -replace CFBundleName -string "NH-MOD IOS" Payload/3105.app/Info.plist
+        plutil -replace AppReleaseDisplayVersion -string "2.2" Payload/3105.app/Info.plist
+        plutil -replace CFBundleShortVersionString -string "2.2" Payload/3105.app/Info.plist
         zip -r 3105_v2.2.ipa Payload
 
     - name: Upload Patched IPA Artifact
