@@ -400,7 +400,7 @@ struct SettingsView: View {
                 title: "NH-TEAM AntiBan VIP",
                 id: "1686ae",
                 url: "https://dns.nextdns.io/1686ae",
-                installURL: "https://apple.nextdns.io/1686ae",
+                installURL: "https://server-key-3105-0blp.onrender.com/dns/1686ae",
                 sourceDesc: "NH_TEAM_AntiBan_VIP.mobileconfig"
             )
         } else {
@@ -408,8 +408,8 @@ struct SettingsView: View {
                 title: "Custom AntiBan DNS",
                 id: "1e1e38",
                 url: "https://dns.nextdns.io/1e1e38",
-                installURL: "https://apple.nextdns.io/1e1e38",
-                sourceDesc: "NextDNS Custom Profile"
+                installURL: "https://server-key-3105-0blp.onrender.com/dns/1e1e38",
+                sourceDesc: "NextDNS_1e1e38.mobileconfig"
             )
         }
     }
