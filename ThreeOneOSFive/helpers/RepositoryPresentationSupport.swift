@@ -182,25 +182,38 @@ actor RepositoryImagePipeline {
             
             // 2. Try fallback URL download
             let primaryStr = url.absoluteString
-            let fallbackStr = primaryStr.contains("server-key-3105.onrender.com")
-                ? primaryStr.replacingOccurrences(of: "server-key-3105.onrender.com", with: "server-key-3105-oiaa.onrender.com")
-                : primaryStr.replacingOccurrences(of: "server-key-3105-oiaa.onrender.com", with: "server-key-3105.onrender.com")
-                
-            if let fallbackURL = URL(string: fallbackStr) {
-                do {
-                    let targetURL = appendToken(to: fallbackURL)
-                    var request = URLRequest(url: targetURL)
-                    request.cachePolicy = .useProtocolCachePolicy
-                    request.setValue("3105", forHTTPHeaderField: "User-Agent")
-                    let (data, response) = try await session.data(for: request)
-                    if let response = response as? HTTPURLResponse,
-                       (200..<300).contains(response.statusCode),
-                       response.mimeType?.hasPrefix("image/") == true,
-                       data.count <= Self.maximumImageBytes {
-                        return data
+            let serverHosts = [
+                "server-key-3105-0blp.onrender.com",
+                "server-key-3105-6sbz.onrender.com",
+                "server-key-3105.onrender.com",
+                "server-key-3105-oiaa.onrender.com"
+            ]
+            for host in serverHosts {
+                if !primaryStr.contains(host) {
+                    var fallbackStr = primaryStr
+                    for currentHost in serverHosts {
+                        if primaryStr.contains(currentHost) {
+                            fallbackStr = primaryStr.replacingOccurrences(of: currentHost, with: host)
+                            break
+                        }
                     }
-                } catch {
-                    downloadError = error
+                    if let fallbackURL = URL(string: fallbackStr) {
+                        do {
+                            let targetURL = appendToken(to: fallbackURL)
+                            var request = URLRequest(url: targetURL)
+                            request.cachePolicy = .useProtocolCachePolicy
+                            request.setValue("3105", forHTTPHeaderField: "User-Agent")
+                            let (data, response) = try await session.data(for: request)
+                            if let response = response as? HTTPURLResponse,
+                               (200..<300).contains(response.statusCode),
+                               response.mimeType?.hasPrefix("image/") == true,
+                               data.count <= Self.maximumImageBytes {
+                                return data
+                            }
+                        } catch {
+                            downloadError = error
+                        }
+                    }
                 }
             }
             

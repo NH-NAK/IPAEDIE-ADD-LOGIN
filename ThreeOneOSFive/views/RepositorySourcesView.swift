@@ -405,20 +405,41 @@ private struct RepositoryTagPackagesView: View {
 private extension RepositorySource {
     var displayName: String {
         let host = manifestURL.host?.lowercased() ?? ""
+        let path = manifestURL.path.lowercased()
+        var suffix = ""
+        if path.contains("repo_ff") {
+            suffix = " (FF)"
+        } else if path.contains("repo_mlbb") {
+            suffix = " (MLBB)"
+        }
+
+        if host.contains("server-key-3105-0blp.onrender.com") {
+            return "V4" + suffix
+        }
         if host.contains("server-key-3105-6sbz.onrender.com") {
-            return "V3"
+            return "V3" + suffix
         }
         if host.contains("server-key-3105-oiaa.onrender.com") {
-            return "V2"
+            return "V2" + suffix
         }
         if host.contains("server-key-3105.onrender.com") {
-            return "V1"
+            return "V1" + suffix
         }
-        return host
+        return host + suffix
     }
 
     var iconText: String {
         let host = manifestURL.host?.lowercased() ?? ""
+        let path = manifestURL.path.lowercased()
+        if path.contains("repo_ff") {
+            return "FF"
+        }
+        if path.contains("repo_mlbb") {
+            return "ML"
+        }
+        if host.contains("server-key-3105-0blp.onrender.com") {
+            return "V4"
+        }
         if host.contains("server-key-3105-6sbz.onrender.com") {
             return "V3"
         }

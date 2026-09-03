@@ -34,10 +34,11 @@ final class PackageRepositoryStore: ObservableObject {
         } else {
             resolutionIndex = RepositoryPackageResolutionIndex()
         }
-        let defaultRepo1 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-6sbz.onrender.com/repo.json")!)
-        let defaultRepo2 = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
-        let defaultRepo3 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!)
-        sources = [defaultRepo1, defaultRepo2, defaultRepo3]
+        let defaultRepo1 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-0blp.onrender.com/repo.json")!)
+        let defaultRepo2 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-6sbz.onrender.com/repo.json")!)
+        let defaultRepo3 = RepositorySource(manifestURL: URL(string: "https://server-key-3105.onrender.com/repo.json")!)
+        let defaultRepo4 = RepositorySource(manifestURL: URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!)
+        sources = [defaultRepo1, defaultRepo2, defaultRepo3, defaultRepo4]
         persist()
         for source in sources {
             sourceStates[source.id] = .idle
@@ -96,11 +97,17 @@ final class PackageRepositoryStore: ObservableObject {
     @discardableResult
     func addSource(rawURL: String) -> Bool {
         do {
-            let allowedURL1 = "https://server-key-3105-6sbz.onrender.com/repo.json"
-            let allowedURL2 = "https://server-key-3105.onrender.com/repo.json"
-            let allowedURL3 = "https://server-key-3105-oiaa.onrender.com/repo.json"
+            let allowedHosts = [
+                "server-key-3105-0blp.onrender.com",
+                "server-key-3105-6sbz.onrender.com",
+                "server-key-3105.onrender.com",
+                "server-key-3105-oiaa.onrender.com"
+            ]
             let trimmed = rawURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.caseInsensitiveCompare(allowedURL1) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL2) == .orderedSame || trimmed.caseInsensitiveCompare(allowedURL3) == .orderedSame else {
+            guard let candidate = URL(string: trimmed),
+                  let host = candidate.host?.lowercased(),
+                  allowedHosts.contains(host),
+                  candidate.path.hasSuffix(".json") else {
                 throw PackageRepositoryError.insecureURL
             }
             guard !sources.contains(where: {
@@ -128,9 +135,13 @@ final class PackageRepositoryStore: ObservableObject {
     }
 
     func removeSource(_ source: RepositorySource) {
-        let allowedURL1 = "https://server-key-3105.onrender.com/repo.json"
-        let allowedURL2 = "https://server-key-3105-oiaa.onrender.com/repo.json"
-        guard source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL1) != .orderedSame && source.manifestURL.absoluteString.caseInsensitiveCompare(allowedURL2) != .orderedSame else {
+        let protectedURLs = [
+            "https://server-key-3105-0blp.onrender.com/repo.json",
+            "https://server-key-3105-6sbz.onrender.com/repo.json",
+            "https://server-key-3105.onrender.com/repo.json",
+            "https://server-key-3105-oiaa.onrender.com/repo.json"
+        ]
+        guard !protectedURLs.contains(where: { $0.caseInsensitiveCompare(source.manifestURL.absoluteString) == .orderedSame }) else {
             return
         }
         sources.removeAll { $0.id == source.id }
@@ -493,6 +504,7 @@ private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskD
 enum PackageRepositoryNetworkClient {
     static func loadSourceCatalog(from catalogURL: URL) async throws -> [URL] {
         return [
+            URL(string: "https://server-key-3105-0blp.onrender.com/repo.json")!,
             URL(string: "https://server-key-3105-6sbz.onrender.com/repo.json")!,
             URL(string: "https://server-key-3105.onrender.com/repo.json")!,
             URL(string: "https://server-key-3105-oiaa.onrender.com/repo.json")!
@@ -551,19 +563,32 @@ enum PackageRepositoryNetworkClient {
         
         // 2. Try fallback download URL if primary failed
         let primaryStr = package.downloadURL.absoluteString
-        let fallbackStr = primaryStr.contains("server-key-3105.onrender.com")
-            ? primaryStr.replacingOccurrences(of: "server-key-3105.onrender.com", with: "server-key-3105-oiaa.onrender.com")
-            : primaryStr.replacingOccurrences(of: "server-key-3105-oiaa.onrender.com", with: "server-key-3105.onrender.com")
-            
-        if let fallbackURL = URL(string: fallbackStr) {
-            do {
-                let download = try await downloadFile(
-                    from: fallbackURL,
-                    maximumBytes: maximumBytes
-                )
-                return try verifyDownloadedFile(download, package: package)
-            } catch {
-                downloadError = error
+        let serverHosts = [
+            "server-key-3105-0blp.onrender.com",
+            "server-key-3105-6sbz.onrender.com",
+            "server-key-3105.onrender.com",
+            "server-key-3105-oiaa.onrender.com"
+        ]
+        for host in serverHosts {
+            if !primaryStr.contains(host) {
+                var fallbackStr = primaryStr
+                for currentHost in serverHosts {
+                    if primaryStr.contains(currentHost) {
+                        fallbackStr = primaryStr.replacingOccurrences(of: currentHost, with: host)
+                        break
+                    }
+                }
+                if let fallbackURL = URL(string: fallbackStr) {
+                    do {
+                        let download = try await downloadFile(
+                            from: fallbackURL,
+                            maximumBytes: maximumBytes
+                        )
+                        return try verifyDownloadedFile(download, package: package)
+                    } catch {
+                        downloadError = error
+                    }
+                }
             }
         }
         

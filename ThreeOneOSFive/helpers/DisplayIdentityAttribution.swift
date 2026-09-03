@@ -118,7 +118,7 @@ struct DisplayAttributionSheet: View {
                     HStack(spacing: 14) {
                         AppLogo(size: 44)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("3105")
+                            Text("NH-MOD IOS")
                                 .font(.headline)
                             Text(language.text("attribution.subtitle"))
                                 .font(.subheadline)

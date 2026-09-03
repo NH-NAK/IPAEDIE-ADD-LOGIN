@@ -72,6 +72,7 @@ struct CyberLoginView: View {
     
     private func verifyKeyOnline(key: String, completion: @escaping (Bool, String?) -> Void) {
         let urls = [
+            "https://server-key-3105-0blp.onrender.com/api/keys/verify",
             "https://server-key-3105-6sbz.onrender.com/api/keys/verify",
             "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
             "https://server-key-3105.onrender.com/api/keys/verify"
@@ -275,6 +276,7 @@ struct ThreeOneOSFiveApp: App {
         let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
         
         let urls = [
+            "https://server-key-3105-0blp.onrender.com/api/keys/verify",
             "https://server-key-3105-6sbz.onrender.com/api/keys/verify",
             "https://server-key-3105-oiaa.onrender.com/api/keys/verify",
             "https://server-key-3105.onrender.com/api/keys/verify"
@@ -343,6 +345,12 @@ struct ThreeOneOSFiveApp: App {
                         UserDefaults.standard.set(key, forKey: "saved_license_key")
                         if let downloadToken = json["downloadToken"] as? String {
                             UserDefaults.standard.set(downloadToken, forKey: "download_token")
+                        }
+                        if let keyType = json["keyType"] as? String {
+                            UserDefaults.standard.set(keyType, forKey: "license_key_type")
+                        }
+                        if let allowedGames = json["allowedGames"] as? [String] {
+                            UserDefaults.standard.set(allowedGames, forKey: "license_allowed_games")
                         }
                         if let expiresAt = json["expiresAt"] as? String {
                             UserDefaults.standard.set(expiresAt, forKey: "license_expires_at")
@@ -481,6 +489,13 @@ struct ThreeOneOSFiveApp: App {
                     _ = try? DevicePatchService.restoreAllAppliedPatches()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UserDidLogoutNotification"))) { _ in
+                withAnimation(.easeInOut) {
+                    isUnlocked = false
+                    passcode = ""
+                    loginMessage = "សូមបញ្ចូល KEY សម្រាប់ចូលប្រើប្រាស់"
+                }
+            }
             .overlay {
                 if let ann = activeAnnouncement {
                     CyberAnnouncementView(item: ann) {
@@ -497,6 +512,7 @@ struct ThreeOneOSFiveApp: App {
 
     private func fetchAnnouncementConfig() {
         let urls = [
+            "https://server-key-3105-0blp.onrender.com/api/config",
             "https://server-key-3105-6sbz.onrender.com/api/config",
             "https://server-key-3105-oiaa.onrender.com/api/config",
             "https://server-key-3105.onrender.com/api/config"
@@ -619,6 +635,13 @@ class AppState: ObservableObject {
     @Published var exploitStatus: ExploitStatus = .notStarted
     @Published var unsupportedMessage: String?
     @Published var kernelExploitRunning = false
+
+    func logout() {
+        UserDefaults.standard.set(false, forKey: "is_license_verified")
+        UserDefaults.standard.set("", forKey: "saved_license_key")
+        UserDefaults.standard.set("", forKey: "download_token")
+        NotificationCenter.default.post(name: Notification.Name("UserDidLogoutNotification"), object: nil)
+    }
 
     private var autoRunAttempted = false
 
