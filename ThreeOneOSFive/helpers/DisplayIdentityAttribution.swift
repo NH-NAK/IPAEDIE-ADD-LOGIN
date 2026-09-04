@@ -43,46 +43,11 @@ private struct WindowLongPressView: UIViewRepresentable {
         }
 
         func installIfNeeded(hostView: UIView) {
-            let allWindows: [UIWindow] = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .flatMap({ $0.windows })
-            let win = hostView.window
-                ?? allWindows.first(where: { $0.isKeyWindow })
-                ?? allWindows.first
-            guard let win else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak hostView] in
-                    guard let hv = hostView else { return }
-                    self.installIfNeeded(hostView: hv)
-                }
-                return
-            }
-            if window === win, recognizer != nil { return }
-            if let old = recognizer, let w = window { w.removeGestureRecognizer(old) }
-            window = win
-            let r = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-            r.minimumPressDuration = 5
-            r.cancelsTouchesInView = false
-            r.delaysTouchesBegan = false
-            r.delaysTouchesEnded = false
-            r.delegate = self
-            r.allowableMovement = 80
-            win.addGestureRecognizer(r)
-            recognizer = r
-            // Re-check after scene transitions (onboarding dismiss, etc.)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak hostView] in
-                guard let hv = hostView else { return }
-                if hv.window != nil, hv.window !== win { self.installIfNeeded(hostView: hv) }
-            }
+            // Disabled: Do not install any attribution gestures on window
         }
 
         @objc private func handleLongPress(_ g: UILongPressGestureRecognizer) {
-            guard g.state == .began else { return }
-            guard enabled else { return }
-            let now = Date()
-            if now.timeIntervalSince(lastFire) < 2 { return }
-            lastFire = now
-            _ = AppInfo.launchAttestationToken
-            isPresented.wrappedValue = true
+            // Disabled
         }
 
         // Don't block any other gesture (List row tap, scroll, NavigationLink).
@@ -92,74 +57,14 @@ private struct WindowLongPressView: UIViewRepresentable {
     }
 }
 
-private struct DisplayIdentityAttributionModifier: ViewModifier {
-    @Binding var isPresented: Bool
-    var enabled: Bool
-
-    func body(content: Content) -> some View {
-        content.background(WindowLongPressView(enabled: enabled, isPresented: $isPresented))
-    }
-}
-
 extension View {
     func displayIdentityAttribution(isPresented: Binding<Bool>, enabled: Bool) -> some View {
-        modifier(DisplayIdentityAttributionModifier(isPresented: isPresented, enabled: enabled))
+        self
     }
 }
 
 struct DisplayAttributionSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appLanguage) private var language
-
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    HStack(spacing: 14) {
-                        AppLogo(size: 44)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("NH-MOD IOS")
-                                .font(.headline)
-                            Text(language.text("attribution.subtitle"))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                if let url = DisplayIdentityAttributionURL() {
-                    Section(language.text("attribution.link_section")) {
-                        LabeledContent(language.text("attribution.url")) {
-                            Text(url.absoluteString)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.trailing)
-                                .textSelection(.enabled)
-                        }
-
-                        Link(destination: url) {
-                            Label(language.text("attribution.open"), systemImage: "arrow.up.right.square")
-                        }
-
-                        ShareLink(item: url) {
-                            Label(language.text("attribution.share"), systemImage: "square.and.arrow.up")
-                        }
-                    }
-                }
-            }
-            .formStyle(.grouped)
-            .tint(AppTheme.accent)
-            .scrollContentBackground(.hidden)
-            .background(AppTheme.pageBackground)
-            .navigationTitle(language.text("attribution.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(language.text("common.close")) { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
+        EmptyView()
     }
 }

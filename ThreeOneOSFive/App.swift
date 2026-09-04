@@ -205,7 +205,6 @@ struct ThreeOneOSFiveApp: App {
     @AppStorage(AppLanguage.storageKey) private var languageCode = AppLanguage.english.rawValue
     @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = false
     @State private var showOnboarding = OnboardingStore.shouldShow()
-    @State private var showAttribution = false
     @State private var updateOffer: AppUpdateChecker.Offer?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -442,10 +441,6 @@ struct ThreeOneOSFiveApp: App {
                         }
                     )
                 }
-            }
-            .displayIdentityAttribution(isPresented: $showAttribution, enabled: !showOnboarding && isUnlocked)
-            .sheet(isPresented: $showAttribution) {
-                DisplayAttributionSheet()
             }
             .alert(item: $updateOffer) { offer in
                 Alert(
