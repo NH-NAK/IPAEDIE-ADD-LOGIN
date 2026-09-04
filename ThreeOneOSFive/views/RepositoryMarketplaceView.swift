@@ -485,7 +485,8 @@ struct RepositoryPackageDetailView: View {
             if let origin = item.origin, origin.packageIdentifier == record.package.identifier {
                 return true
             }
-            return item.project.name.caseInsensitiveCompare(record.package.name) == .orderedSame
+            guard let project = item.project else { return false }
+            return project.name.caseInsensitiveCompare(record.package.name) == .orderedSame
         }
     }
 

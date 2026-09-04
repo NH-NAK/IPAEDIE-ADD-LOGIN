@@ -358,7 +358,7 @@ final class PatchProjectStore: ObservableObject {
         }
         if let origin {
             if let matchedOrigin = items.first(where: { item in
-                guard let itemOrigin = try? PatchProjectLibrary.origin(forPackageID: item.id) else { return false }
+                guard let itemOrigin = item.origin else { return false }
                 return itemOrigin.packageIdentifier == origin.packageIdentifier
             })?.packageURL {
                 return matchedOrigin
