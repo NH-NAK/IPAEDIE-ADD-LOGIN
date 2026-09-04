@@ -667,3 +667,27 @@
 "settings.developer_mode_footer" = "Chế độ nhà phát triển thêm mục Tệp vào thanh điều hướng chính. Tệp có thể duyệt và chỉnh sửa container ứng dụng.";
 "wallpaper.package_details" = "Chi tiết gói";
 "wallpaper.package_files" = "%lld tệp";
+
+"browser.clean_restore_title" = "Dọn dẹp & Khôi phục file gốc";
+"browser.clean_restore_subtitle" = "Khôi phục file gốc và xóa file mod đã import";
+"browser.clean_restore_confirm_title" = "Dọn dẹp & Khôi phục file gốc?";
+"browser.clean_restore_confirm_message" = "Thao tác này sẽ khôi phục %lld file gốc đã bị thay thế và xóa %lld file mới được import trong thư mục game này.";
+"browser.clean_restore_action" = "Dọn dẹp & Khôi phục";
+"browser.clean_restore_hint" = "Chạm để xóa mod và khôi phục file gốc";
+"browser.clear_history_only" = "Giữ file hiện tại & Xóa lịch sử";
+"browser.clear_history_confirm_title" = "Giữ file hiện tại làm file gốc?";
+"browser.clear_history_confirm_message" = "Thao tác này sẽ xóa các bản sao lưu và coi file hiện tại là file vĩnh viễn.";
+"browser.clean_restore_progress" = "Đang khôi phục file gốc…";
+"browser.clean_restore_done_title" = "Khôi phục hoàn tất";
+"browser.clean_restore_done_message" = "Đã khôi phục %lld file gốc và xóa %lld file đã import thành công.";
+"browser.clean_restore_error_title" = "Khôi phục thất bại";
+"browser.import_history_title" = "Lịch sử Import";
+"browser.import_history_empty" = "Chưa có file import nào được ghi nhận trong vùng dữ liệu này.";
+"browser.restore_file" = "Khôi phục file gốc";
+"browser.remove_imported_file" = "Xóa file đã import";
+"browser.restore_file_confirm" = "Khôi phục file gốc cho “%@”?";
+"browser.status_replaced" = "Đã thay thế (Có sao lưu gốc)";
+"browser.status_added" = "File mới import";
+"browser.tracking_banner_both" = "%lld file thay thế, %lld file thêm mới";
+"browser.tracking_banner_replaced" = "Đã thay thế %lld file gốc";
+"browser.tracking_banner_added" = "Đã thêm %lld file mới import";

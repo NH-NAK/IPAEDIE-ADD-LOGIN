@@ -477,10 +477,16 @@ struct RepositoryPackageDetailView: View {
         if record.package.kind == .wallpaper {
             return repositoryStore.isInstalled(record)
         }
-        guard let packageID = repositoryStore.resolvedPackageID(for: record) else {
-            return false
+        if let packageID = repositoryStore.resolvedPackageID(for: record),
+           patchStore.items.contains(where: { $0.id == packageID }) {
+            return true
         }
-        return patchStore.items.contains { $0.id == packageID }
+        return patchStore.items.contains { item in
+            if let origin = item.origin, origin.packageIdentifier == record.package.identifier {
+                return true
+            }
+            return item.project.name.caseInsensitiveCompare(record.package.name) == .orderedSame
+        }
     }
 
     var body: some View {

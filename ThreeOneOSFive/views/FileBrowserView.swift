@@ -35,6 +35,9 @@ struct FileBrowserView: View {
     @State private var transferSession: FileTransferSession?
     @State private var transferConflict: FileTransferConflict?
     @State private var deleteTargets: [FileEntry] = []
+    @State private var importSummary: ImportSummary = .empty
+    @State private var isShowingRestoreConfirmation = false
+    @State private var isShowingImportHistorySheet = false
     @AppStorage(FileBrowserSortOrder.storageKey)
     private var sortOrderRaw = FileBrowserSortOrder.nameAscending.rawValue
 
@@ -90,6 +93,14 @@ struct FileBrowserView: View {
                 clearLabel: language.text("common.clear")
             )
             Divider()
+            if importSummary.hasItems {
+                ImportTrackingBanner(
+                    summary: importSummary,
+                    language: language,
+                    onCleanRestore: { isShowingRestoreConfirmation = true },
+                    onViewHistory: { isShowingImportHistorySheet = true }
+                )
+            }
             List {
                 Section {
                     ForEach(filteredEntries) { entry in
@@ -180,6 +191,25 @@ struct FileBrowserView: View {
                                 language.text("browser.import_files"),
                                 systemImage: "square.and.arrow.down"
                             )
+                        }
+                        if importSummary.hasItems {
+                            Divider()
+                            Button(role: .destructive) {
+                                isShowingRestoreConfirmation = true
+                            } label: {
+                                Label(
+                                    language.text("browser.clean_restore_title"),
+                                    systemImage: "arrow.uturn.backward.circle"
+                                )
+                            }
+                            Button {
+                                isShowingImportHistorySheet = true
+                            } label: {
+                                Label(
+                                    language.text("browser.import_history_title"),
+                                    systemImage: "clock.arrow.circlepath"
+                                )
+                            }
                         }
                         Divider()
                         Button {
@@ -365,6 +395,23 @@ struct FileBrowserView: View {
                 dismissButton: .default(Text(language.text("common.done")))
             )
         }
+        .alert(language.text("browser.clean_restore_confirm_title"), isPresented: $isShowingRestoreConfirmation) {
+            Button(language.text("common.cancel"), role: .cancel) {}
+            Button(language.text("browser.clean_restore_action"), role: .destructive) {
+                performCleanAndRestoreAll()
+            }
+        } message: {
+            Text(language.text("browser.clean_restore_confirm_message", Int64(importSummary.replacedCount), Int64(importSummary.addedCount)))
+        }
+        .sheet(isPresented: $isShowingImportHistorySheet) {
+            ImportHistoryView(
+                containerPath: containerPath,
+                bundleID: bundleID,
+                onModified: {
+                    load()
+                }
+            )
+        }
     }
 
     private var sortOrder: FileBrowserSortOrder {
@@ -483,6 +530,22 @@ struct FileBrowserView: View {
                     language.text("browser.replace"),
                     systemImage: "arrow.triangle.2.circlepath"
                 )
+            }
+        }
+        if let tracked = ImportBackupManager.shared.record(forPath: entry.path, containerPath: containerPath, bundleID: bundleID) {
+            Divider()
+            if tracked.wasReplaced {
+                Button {
+                    restoreTrackedEntry(tracked)
+                } label: {
+                    Label(language.text("browser.restore_file"), systemImage: "arrow.uturn.backward.circle")
+                }
+            } else {
+                Button(role: .destructive) {
+                    restoreTrackedEntry(tracked)
+                } label: {
+                    Label(language.text("browser.remove_imported_file"), systemImage: "trash")
+                }
             }
         }
         Button {
@@ -816,6 +879,12 @@ struct FileBrowserView: View {
         guard let session = transferSession else { return }
         let mode = session.mode
         let destinationDirectory = session.destinationDirectory
+        let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
+        let preImportAction = ImportBackupManager.shared.prepareRecordBeforeImport(
+            targetURL: destinationURL,
+            containerPath: containerPath,
+            bundleID: bundleID
+        )
         activityText = language.text(mode == .copy ? "browser.copying" : "browser.moving")
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -825,6 +894,13 @@ struct FileBrowserView: View {
                     mode: mode,
                     conflictPolicy: policy
                 )
+                if let preImportAction {
+                    ImportBackupManager.shared.commitImportAction(
+                        preImportAction,
+                        containerPath: containerPath,
+                        bundleID: bundleID
+                    )
+                }
                 log(
                     "filebrowser: transfer succeeded mode=\(mode) " +
                         "source=\(sourceURL.path) destination=\(result.destinationURL.path)"
@@ -839,6 +915,9 @@ struct FileBrowserView: View {
                     DispatchQueue.main.async { processNextTransfer() }
                 }
             } catch {
+                if let preImportAction {
+                    ImportBackupManager.shared.cancelImportAction(preImportAction)
+                }
                 log(
                     "filebrowser: transfer failed mode=\(mode) source=\(sourceURL.path) " +
                         "error=\(error.localizedDescription)"
@@ -1048,12 +1127,24 @@ struct FileBrowserView: View {
             defer {
                 if hasSecurityScope { sourceURL.stopAccessingSecurityScopedResource() }
             }
+            let preImportAction = ImportBackupManager.shared.prepareRecordBeforeImport(
+                targetURL: destinationURL,
+                containerPath: containerPath,
+                bundleID: bundleID
+            )
             do {
                 let result = try FileManagerService.importFile(
                     sourceURL,
                     into: destinationDirectory,
                     replaceExisting: replaceExisting
                 )
+                if let preImportAction {
+                    ImportBackupManager.shared.commitImportAction(
+                        preImportAction,
+                        containerPath: containerPath,
+                        bundleID: bundleID
+                    )
+                }
                 log(
                     "filebrowser: import succeeded path=\(result.destinationURL.path) " +
                         "bytes=\(result.byteCount) disposition=\(result.disposition)"
@@ -1068,6 +1159,9 @@ struct FileBrowserView: View {
                     DispatchQueue.main.async { processNextImport() }
                 }
             } catch {
+                if let preImportAction {
+                    ImportBackupManager.shared.cancelImportAction(preImportAction)
+                }
                 log(
                     "filebrowser: import failed source=\(sourceURL.lastPathComponent) " +
                         "error=\(error.localizedDescription)"
@@ -1170,6 +1264,7 @@ struct FileBrowserView: View {
     }
 
     private func load() {
+        refreshImportSummary()
         let shouldGrant = !hasGranted && ContainerAccessPolicy.shouldRequestGrant(isRoot: isRoot)
         hasGranted = true
         isLoadingEntries = true
@@ -1336,12 +1431,24 @@ struct FileBrowserView: View {
                         selection.sourceURL.stopAccessingSecurityScopedResource()
                     }
                 }
+                let preImportAction = ImportBackupManager.shared.prepareRecordBeforeImport(
+                    targetURL: selection.targetURL,
+                    containerPath: containerPath,
+                    bundleID: bundleID
+                )
                 do {
                     log("filebrowser: replacement copy begin target=\(selection.targetName)")
                     let replacement = try FileReplacementService.replace(
                         target: selection.targetURL,
                         with: selection.sourceURL
                     )
+                    if let preImportAction {
+                        ImportBackupManager.shared.commitImportAction(
+                            preImportAction,
+                            containerPath: containerPath,
+                            bundleID: bundleID
+                        )
+                    }
                     let size = ByteCountFormatter.string(
                         fromByteCount: replacement.byteCount,
                         countStyle: .file
@@ -1363,6 +1470,9 @@ struct FileBrowserView: View {
                         )
                     }
                 } catch {
+                    if let preImportAction {
+                        ImportBackupManager.shared.cancelImportAction(preImportAction)
+                    }
                     log(
                         "filebrowser: replace failed target=\(selection.targetURL.path) " +
                             "error=\(error.localizedDescription)"
@@ -1395,6 +1505,70 @@ struct FileBrowserView: View {
         case .replacementFailed: key = "browser.replace_error_failed"
         }
         return language.text(key)
+    }
+
+    private func refreshImportSummary() {
+        importSummary = ImportBackupManager.shared.summary(
+            containerPath: containerPath,
+            bundleID: bundleID
+        )
+    }
+
+    private func performCleanAndRestoreAll() {
+        activityText = language.text("browser.clean_restore_progress")
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let summary = try ImportBackupManager.shared.restoreAndCleanAll(
+                    containerPath: containerPath,
+                    bundleID: bundleID
+                )
+                DispatchQueue.main.async {
+                    activityText = nil
+                    load()
+                    operationNotice = FileReplacementNotice(
+                        title: language.text(summary.isSuccess ? "browser.clean_restore_done_title" : "browser.clean_restore_error_title"),
+                        message: language.text(
+                            "browser.clean_restore_done_message",
+                            Int64(summary.restoredOriginalsCount),
+                            Int64(summary.removedNewFilesCount)
+                        )
+                    )
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    activityText = nil
+                    operationNotice = FileReplacementNotice(
+                        title: language.text("browser.clean_restore_error_title"),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
+
+    private func restoreTrackedEntry(_ record: ImportedFileRecord) {
+        activityText = language.text("browser.clean_restore_progress")
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try ImportBackupManager.shared.restoreSingleRecord(
+                    record,
+                    containerPath: containerPath,
+                    bundleID: bundleID
+                )
+                DispatchQueue.main.async {
+                    activityText = nil
+                    load()
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    activityText = nil
+                    operationNotice = FileReplacementNotice(
+                        title: language.text("browser.clean_restore_error_title"),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1834,3 +2008,58 @@ private struct FileQuickLookController: UIViewControllerRepresentable {
         }
     }
 }
+
+private struct ImportTrackingBanner: View {
+    let summary: ImportSummary
+    let language: AppLanguage
+    let onCleanRestore: () -> Void
+    let onViewHistory: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bannerTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(language.text("browser.clean_restore_hint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(language.text("browser.clean_restore_action"), action: onCleanRestore)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+            Button {
+                onViewHistory()
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+    }
+
+    private var bannerTitle: String {
+        if summary.replacedCount > 0 && summary.addedCount > 0 {
+            return language.text("browser.tracking_banner_both", Int64(summary.replacedCount), Int64(summary.addedCount))
+        } else if summary.replacedCount > 0 {
+            return language.text("browser.tracking_banner_replaced", Int64(summary.replacedCount))
+        } else {
+            return language.text("browser.tracking_banner_added", Int64(summary.addedCount))
+        }
+    }
+}
+

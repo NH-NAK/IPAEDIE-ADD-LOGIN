@@ -679,4 +679,26 @@
 "patch.delete_package_confirm_title" = "Delete this patch package?";
 "patch.delete_package_confirm_message" = "This patch package and its active mod files will be permanently deleted from 3105. Original game files will be restored.";
 
-
+"browser.clean_restore_title" = "Clean & Restore Original Files";
+"browser.clean_restore_subtitle" = "Restore original files and remove imported mods";
+"browser.clean_restore_confirm_title" = "Clean & Restore Original Files?";
+"browser.clean_restore_confirm_message" = "This will restore %lld replaced original files and remove %lld newly added files in this game data container.";
+"browser.clean_restore_action" = "Clean & Restore";
+"browser.clean_restore_hint" = "Tap to revert mods and restore originals";
+"browser.clear_history_only" = "Keep Files & Clear History";
+"browser.clear_history_confirm_title" = "Keep Current Files?";
+"browser.clear_history_confirm_message" = "This will remove all backup copies and make the current imported files the permanent files.";
+"browser.clean_restore_progress" = "Restoring original files…";
+"browser.clean_restore_done_title" = "Restore Complete";
+"browser.clean_restore_done_message" = "Successfully restored %lld original files and removed %lld imported files.";
+"browser.clean_restore_error_title" = "Restore Failed";
+"browser.import_history_title" = "Import History";
+"browser.import_history_empty" = "No imported files tracked in this container.";
+"browser.restore_file" = "Restore Original File";
+"browser.remove_imported_file" = "Remove Imported File";
+"browser.restore_file_confirm" = "Restore original file for “%@”?";
+"browser.status_replaced" = "Replaced (Original Backed Up)";
+"browser.status_added" = "Newly Imported";
+"browser.tracking_banner_both" = "%lld replaced, %lld added";
+"browser.tracking_banner_replaced" = "%lld original files replaced";
+"browser.tracking_banner_added" = "%lld imported files added";

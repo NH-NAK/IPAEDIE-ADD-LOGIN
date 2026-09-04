@@ -210,17 +210,43 @@ enum PatchProjectLibrary {
             packageID: summary.packageID,
             fileManager: fileManager
         )
-        if let occupiedPath = overlappingTargetPath(
-            in: decoded.project,
-            excludingPackageID: summary.packageID,
-            fileManager: fileManager
-        ) {
-            if decoded.project.isPrivate, !authorCopy {
-                throw PatchPackageError.privateOperationFailed
+
+        // Find existing package in library if existingURL is not explicitly provided
+        let existingItems = load(fileManager: fileManager)
+        let resolvedExistingURL: URL? = existingURL ?? existingItems.first(where: { item in
+            if item.id == summary.packageID { return true }
+            if let origin, let itemOrigin = item.origin,
+               itemOrigin.packageIdentifier == origin.packageIdentifier,
+               itemOrigin.repositoryURL == origin.repositoryURL {
+                return true
             }
-            throw PatchPackageError.targetOccupied(occupiedPath)
+            if let itemProject = item.project,
+               itemProject.name.caseInsensitiveCompare(decoded.project.name) == .orderedSame {
+                return true
+            }
+            return false
+        })?.packageURL
+
+        // If updating an existing package that had a different packageID, clean up old metadata
+        if let resolvedExistingURL,
+           let oldItem = existingItems.first(where: { $0.packageURL.standardizedFileURL == resolvedExistingURL.standardizedFileURL }),
+           oldItem.id != summary.packageID {
+            let backupRoot = try? backupRootURL(fileManager: fileManager)
+            if let backupRoot,
+               let receipt = PatchTransaction.latestReceipt(projectID: oldItem.id, backupRoot: backupRoot, fileManager: fileManager) {
+                try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+            }
+            try? PatchWorkspaceService.deleteWorkspace(projectID: oldItem.id, fileManager: fileManager)
+            if let oldOrigin = try? originFileURL(packageID: oldItem.id, fileManager: fileManager), fileManager.fileExists(atPath: oldOrigin.path) {
+                try? fileManager.removeItem(at: oldOrigin)
+            }
+            if let oldMarker = try? authorCopyMarkerURL(packageID: oldItem.id, fileManager: fileManager), fileManager.fileExists(atPath: oldMarker.path) {
+                try? fileManager.removeItem(at: oldMarker)
+            }
+            try? PatchKeyStore.delete(for: oldItem.summary)
         }
-        let previousData = try existingURL.map { try readPackage(at: $0) }
+
+        let previousData = try resolvedExistingURL.map { try readPackage(at: $0) }
         let originURL = try originFileURL(
             packageID: summary.packageID,
             fileManager: fileManager
@@ -234,7 +260,7 @@ enum PatchProjectLibrary {
             savedURL = try save(
                 data: data,
                 projectName: decoded.project.name,
-                existingURL: existingURL,
+                existingURL: resolvedExistingURL,
                 fileManager: fileManager
             )
             if summary.schemaVersion >= 2 {
@@ -259,9 +285,9 @@ enum PatchProjectLibrary {
                 )
             }
         } catch {
-            if let previousData, let existingURL {
+            if let previousData, let resolvedExistingURL {
                 try? previousData.write(
-                    to: existingURL,
+                    to: resolvedExistingURL,
                     options: [.atomic, .completeFileProtection]
                 )
             } else if let savedURL, fileManager.fileExists(atPath: savedURL.path) {

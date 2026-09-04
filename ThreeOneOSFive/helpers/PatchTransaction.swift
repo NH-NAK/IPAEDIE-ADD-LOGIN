@@ -189,6 +189,39 @@ enum PatchTransaction {
             resolvedRules.append(ResolvedRule(rule: rule, containerRoot: root, target: target))
         }
 
+        // Automatically revert conflicting active receipts so switching or updating mods is frictionless
+        if let projectDirectories = try? fileManager.contentsOfDirectory(
+            at: backupRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            let neededKeys = Set(resolvedRules.map { $0.rule.bundleID + "\0" + $0.rule.relativePath })
+            for directory in projectDirectories {
+                guard let projectID = UUID(uuidString: directory.lastPathComponent),
+                      projectID != project.id,
+                      let receipt = latestReceipt(
+                        projectID: projectID,
+                        backupRoot: backupRoot,
+                        fileManager: fileManager
+                      ),
+                      let journal = try? readJournal(receipt.journalURL),
+                      journal.status == .applied || journal.status == .prepared
+                else { continue }
+
+                let hasConflict = journal.records.contains { record in
+                    neededKeys.contains(record.bundleID + "\0" + record.relativePath)
+                }
+                if hasConflict {
+                    try? restore(
+                        receipt: receipt,
+                        allowChangedTargets: true,
+                        containerResolver: containerResolver,
+                        fileManager: fileManager
+                    )
+                }
+            }
+        }
+
         let occupied = appliedTargetKeys(
             backupRoot: backupRoot,
             excludingProjectID: project.id,

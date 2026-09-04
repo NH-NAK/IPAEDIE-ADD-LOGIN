@@ -142,7 +142,7 @@ final class PatchProjectStore: ObservableObject {
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let summary = try PatchPackageCodec.inspect(data)
-                let existingURL = await self?.existingPackageURL(for: summary.packageID)
+                let existingURL = await self?.existingPackageURL(for: summary.packageID, origin: origin)
                 if let pending = try Self.persistImportedPackage(
                     data: data,
                     summary: summary,
@@ -352,8 +352,19 @@ final class PatchProjectStore: ObservableObject {
         isBusy = false
     }
 
-    private func existingPackageURL(for packageID: UUID) -> URL? {
-        items.first(where: { $0.id == packageID })?.packageURL
+    private func existingPackageURL(for packageID: UUID, origin: PatchPackageOrigin? = nil) -> URL? {
+        if let match = items.first(where: { $0.id == packageID })?.packageURL {
+            return match
+        }
+        if let origin {
+            if let matchedOrigin = items.first(where: { item in
+                guard let itemOrigin = try? PatchProjectLibrary.origin(forPackageID: item.id) else { return false }
+                return itemOrigin.packageIdentifier == origin.packageIdentifier
+            })?.packageURL {
+                return matchedOrigin
+            }
+        }
+        return nil
     }
 
     private nonisolated static func persistImportedPackage(
