@@ -316,11 +316,12 @@ struct SettingsView: View {
             .alert("Logout", isPresented: $showLogoutConfirmation) {
                 Button("បោះបង់ (Cancel)", role: .cancel) {}
                 Button("Logout", role: .destructive) {
+                    _ = try? DevicePatchService.restoreAllAppliedPatches()
                     appState.logout()
                     dismiss()
                 }
             } message: {
-                Text("តើអ្នកពិតជាចង់ចាកចេញពី Key បច្ចុប្បន្នមែនទេ? អ្នកនឹងត្រូវបញ្ចូល Key សាជាថ្មីដើម្បីចូលប្រើប្រាស់។")
+                Text("តើអ្នកពិតជាចង់ចាកចេញពី Key បច្ចុប្បន្នមែនទេ? រាល់ MOD ដែលធ្លាប់ Apply នឹងត្រូវ Auto Restore ទៅកាន់ឯកសារដើមវិញទាំងអស់។")
             }
         }
     }

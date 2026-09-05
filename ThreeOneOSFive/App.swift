@@ -289,7 +289,51 @@ struct ThreeOneOSFiveApp: App {
         }
     }
 
+    private func checkLocalExpirationAndEnforce() -> Bool {
+        let rawExpires = UserDefaults.standard.string(forKey: "license_expires_at") ?? "lifetime"
+        if rawExpires != "lifetime" && !rawExpires.isEmpty {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            var targetDate = formatter.date(from: rawExpires)
+            if targetDate == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                targetDate = formatter.date(from: rawExpires)
+            }
+            if targetDate == nil {
+                let df = DateFormatter()
+                df.locale = Locale(identifier: "en_US_POSIX")
+                df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                targetDate = df.date(from: rawExpires)
+            }
+            if targetDate == nil {
+                let df = DateFormatter()
+                df.locale = Locale(identifier: "en_US_POSIX")
+                df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                targetDate = df.date(from: rawExpires)
+            }
+            if let targetDate, Date() >= targetDate {
+                // Key expired! Auto restore all applied mods immediately!
+                _ = try? DevicePatchService.restoreAllAppliedPatches()
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut) {
+                        self.isUnlocked = false
+                        self.passcode = ""
+                        self.loginMessage = "LICENSE KEY ផុតកំណត់ - រាល់ MOD ត្រូវបាន AUTO RESTORE ទៅដើមវិញទាំងអស់"
+                        UserDefaults.standard.set(false, forKey: "is_license_verified")
+                        UserDefaults.standard.set("", forKey: "saved_license_key")
+                        UserDefaults.standard.set("", forKey: "download_token")
+                    }
+                }
+                return true
+            }
+        }
+        return false
+    }
+
     private func verifyLicenseInBackground() {
+        if checkLocalExpirationAndEnforce() {
+            return
+        }
         let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
         
         let urls = [
@@ -403,6 +447,14 @@ struct ThreeOneOSFiveApp: App {
         // If the user swiped away/cleared the app from App Switcher, on fresh cold launch
         // ensure any remaining applied patches are restored to original files and toggle switches turn OFF!
         if UserDefaults.standard.bool(forKey: "autoRestoreOnExit") {
+            _ = try? DevicePatchService.restoreAllAppliedPatches()
+        }
+
+        // When user is not logged in, or logged out:
+        // Ensure that any previous applied mods are completely restored back to original!
+        let isVerified = UserDefaults.standard.bool(forKey: "is_license_verified")
+        let key = UserDefaults.standard.string(forKey: "saved_license_key") ?? ""
+        if !isVerified || key.isEmpty {
             _ = try? DevicePatchService.restoreAllAppliedPatches()
         }
     }
@@ -519,10 +571,11 @@ struct ThreeOneOSFiveApp: App {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UserDidLogoutNotification"))) { _ in
+                _ = try? DevicePatchService.restoreAllAppliedPatches()
                 withAnimation(.easeInOut) {
                     isUnlocked = false
                     passcode = ""
-                    loginMessage = "សូមបញ្ចូល KEY សម្រាប់ចូលប្រើប្រាស់"
+                    loginMessage = "បានចាកចេញ (LOGOUT) - រាល់ MOD ត្រូវបាន AUTO RESTORE ទៅដើមវិញទាំងអស់"
                 }
             }
             .overlay {
@@ -666,6 +719,7 @@ class AppState: ObservableObject {
     @Published var kernelExploitRunning = false
 
     func logout() {
+        _ = try? DevicePatchService.restoreAllAppliedPatches()
         UserDefaults.standard.set(false, forKey: "is_license_verified")
         UserDefaults.standard.set("", forKey: "saved_license_key")
         UserDefaults.standard.set("", forKey: "download_token")

@@ -184,7 +184,11 @@ struct VIPLicenseCountdownBadge: View {
         let diff = expiresDate.timeIntervalSince(Date())
         if diff <= 0 {
             timeRemainingString = "Expired"
-            isExpired = true
+            if !isExpired {
+                isExpired = true
+                _ = try? DevicePatchService.restoreAllAppliedPatches()
+                NotificationCenter.default.post(name: Notification.Name("UserDidLogoutNotification"), object: nil)
+            }
         } else {
             isExpired = false
             let hours = Int(diff) / 3600
