@@ -291,8 +291,13 @@ struct PatchProjectsView: View {
                 )
             }
             .onAppear {
+                repositoryStore.refreshAllIfNeeded()
                 reloadWallpaperPackages()
                 consumeExternalImport()
+            }
+            .task {
+                repositoryStore.refreshAllIfNeeded()
+            }
 #if targetEnvironment(simulator)
                 if ProcessInfo.processInfo.arguments.contains(
                     "--simulate-wallpaper-detail"
@@ -527,16 +532,59 @@ private struct WallpaperImportFeedback: Identifiable {
 private struct PatchProjectRow: View {
     let item: PatchLibraryItem
     let language: AppLanguage
-    let repositoryStore: PackageRepositoryStore
+    @ObservedObject var repositoryStore: PackageRepositoryStore
     @State private var isAppliedState: Bool = false
 
     private var matchingPackage: RepositoryPackage? {
+        // 1. Origin package identifier (most direct & accurate match)
+        if let originID = item.origin?.packageIdentifier {
+            if let match = repositoryStore.packages.first(where: { $0.package.identifier.caseInsensitiveCompare(originID) == .orderedSame }) {
+                return match.package
+            }
+        }
+
+        // 2. Resolved package ID
+        if let match = repositoryStore.packages.first(where: { repositoryStore.resolvedPackageID(for: $0) == item.id }) {
+            return match.package
+        }
+
         guard let name = item.project?.name else { return nil }
         let cleanName = name.replacingOccurrences(of: "_", with: " ").lowercased()
+        let cleanNameNoTag = cleanName
+            .replacingOccurrences(of: "ffth", with: "")
+            .replacingOccurrences(of: "mlbb", with: "")
+            .trimmingCharacters(in: .whitespaces)
+
         for record in repositoryStore.packages {
             let pkg = record.package
             let pkgName = pkg.name.replacingOccurrences(of: "_", with: " ").lowercased()
-            if pkgName == cleanName || pkg.downloadURL.absoluteString.lowercased().contains(cleanName) || cleanName.contains(pkgName) {
+            let pkgNameNoTag = pkgName
+                .replacingOccurrences(of: "ffth", with: "")
+                .replacingOccurrences(of: "mlbb", with: "")
+                .trimmingCharacters(in: .whitespaces)
+
+            // Direct match or contains
+            if pkgName == cleanName || cleanName.contains(pkgName) || pkgName.contains(cleanName) {
+                return pkg
+            }
+
+            if !cleanNameNoTag.isEmpty && (cleanNameNoTag == pkgNameNoTag || cleanNameNoTag.contains(pkgNameNoTag) || pkgNameNoTag.contains(cleanNameNoTag)) {
+                return pkg
+            }
+
+            // Normalize 'lgnis' typo to 'ignis'
+            let normClean = cleanName.replacingOccurrences(of: "lgnis", with: "ignis")
+            let normPkg = pkgName.replacingOccurrences(of: "lgnis", with: "ignis")
+            if normClean.contains(normPkg) || normPkg.contains(normClean) {
+                return pkg
+            }
+
+            // Match download filename (e.g. SKIN_IGNIS_FFTH.3105)
+            let dlFileName = pkg.downloadURL.lastPathComponent
+                .replacingOccurrences(of: ".3105", with: "")
+                .replacingOccurrences(of: "_", with: " ")
+                .lowercased()
+            if !dlFileName.isEmpty && (cleanName.contains(dlFileName) || dlFileName.contains(cleanName)) {
                 return pkg
             }
         }
