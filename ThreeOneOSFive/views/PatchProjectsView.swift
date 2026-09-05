@@ -210,6 +210,9 @@ struct PatchProjectsView: View {
                     onOpenLogs: onOpenLogs
                 )
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AllPatchesDidRestoreNotification"))) { _ in
+                store.reload()
+            }
             .sheet(isPresented: $showImporter) {
                 FileDocumentPicker(
                     allowedContentTypes: PatchPackagePickerPolicy.allowedContentTypes,
@@ -602,6 +605,9 @@ private struct PatchProjectRow: View {
         .onAppear {
             refreshState()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AllPatchesDidRestoreNotification"))) { _ in
+            refreshState()
+        }
     }
 
     private func refreshState() {
@@ -610,12 +616,13 @@ private struct PatchProjectRow: View {
             return
         }
         let key = "mod_applied_\(project.id.uuidString)"
-        let savedState = UserDefaults.standard.object(forKey: key) as? Bool
         let hasReceipt = DevicePatchService.latestReceipt(projectID: project.id) != nil
-        if let saved = savedState {
-            isAppliedState = saved || hasReceipt
+        if !hasReceipt {
+            UserDefaults.standard.set(false, forKey: key)
+            isAppliedState = false
         } else {
-            isAppliedState = hasReceipt
+            let savedState = UserDefaults.standard.object(forKey: key) as? Bool
+            isAppliedState = savedState ?? true
         }
     }
 
@@ -627,8 +634,8 @@ private struct PatchProjectRow: View {
                 UserDefaults.standard.set(true, forKey: key)
                 isAppliedState = true
             } catch {
-                UserDefaults.standard.set(true, forKey: key)
-                isAppliedState = true
+                UserDefaults.standard.set(false, forKey: key)
+                isAppliedState = false
             }
         } else {
             if let receipt = DevicePatchService.latestReceipt(projectID: project.id) {

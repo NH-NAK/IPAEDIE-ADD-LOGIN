@@ -95,7 +95,7 @@ struct CyberLoginView: View {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.3"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.4"
             let body = ["key": key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -195,8 +195,26 @@ struct CyberLoginView: View {
     }
 }
 
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func applicationWillTerminate(_ application: UIApplication) {
+        if UserDefaults.standard.bool(forKey: "autoRestoreOnExit") {
+            var bgTask = UIBackgroundTaskIdentifier.invalid
+            bgTask = application.beginBackgroundTask(withName: "AutoRestoreOnTerminate") {
+                application.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+            _ = try? DevicePatchService.restoreAllAppliedPatches()
+            if bgTask != .invalid {
+                application.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
+    }
+}
+
 @main
 struct ThreeOneOSFiveApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var patchDraftCoordinator = PatchDraftCoordinator()
     @StateObject private var fileOperationCoordinator = FileOperationCoordinator()
@@ -297,7 +315,7 @@ struct ThreeOneOSFiveApp: App {
             request.timeoutInterval = 8.0
             
             let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
-            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.3"
+            let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.4"
             let body = ["key": key.isEmpty ? "PING_CHECK" : key, "deviceId": deviceId, "version": appVersion]
             guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
                 tryUrl(index: index + 1)
@@ -380,6 +398,13 @@ struct ThreeOneOSFiveApp: App {
         setupLogCapture()
         log("app: 3105 launching — iOS \(AppInfo.osVersion) (\(AppInfo.osBuild)) \(AppInfo.machineName)")
         UserDefaults.standard.set(true, forKey: "feature.developer_mode.enabled")
+        
+        // When Auto Restore on App Exit is enabled:
+        // If the user swiped away/cleared the app from App Switcher, on fresh cold launch
+        // ensure any remaining applied patches are restored to original files and toggle switches turn OFF!
+        if UserDefaults.standard.bool(forKey: "autoRestoreOnExit") {
+            _ = try? DevicePatchService.restoreAllAppliedPatches()
+        }
     }
 
     private var language: AppLanguage {
@@ -481,7 +506,16 @@ struct ThreeOneOSFiveApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
                 if autoRestoreOnExit {
+                    var bgTask = UIBackgroundTaskIdentifier.invalid
+                    bgTask = UIApplication.shared.beginBackgroundTask(withName: "AutoRestoreOnWillTerminate") {
+                        UIApplication.shared.endBackgroundTask(bgTask)
+                        bgTask = .invalid
+                    }
                     _ = try? DevicePatchService.restoreAllAppliedPatches()
+                    if bgTask != .invalid {
+                        UIApplication.shared.endBackgroundTask(bgTask)
+                        bgTask = .invalid
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UserDidLogoutNotification"))) { _ in

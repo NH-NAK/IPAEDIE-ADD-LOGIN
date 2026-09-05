@@ -109,7 +109,7 @@ struct ContentView: View {
                     )
                 }
             }
-            .navigationTitle("3105")
+            .navigationTitle("NH-MOD IOS")
             .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
         } detail: {
             sectionContent(selectedVisibleSection)

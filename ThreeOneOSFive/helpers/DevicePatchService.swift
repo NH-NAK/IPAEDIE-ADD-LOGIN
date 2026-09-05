@@ -49,6 +49,12 @@ enum DevicePatchService {
                 }
             )
         }
+        let key = "mod_applied_\(receipt.projectID.uuidString)"
+        UserDefaults.standard.set(false, forKey: key)
+        UserDefaults.standard.synchronize()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+        }
     }
 
     static func resetToAppliedState(
@@ -83,11 +89,25 @@ enum DevicePatchService {
         for receipt in receipts {
             do {
                 try restore(receipt: receipt, allowChangedTargets: true)
+                let key = "mod_applied_\(receipt.projectID.uuidString)"
+                UserDefaults.standard.set(false, forKey: key)
                 restoredCount += 1
             } catch {
                 // Continue restoring remaining receipts
             }
         }
+        
+        // Reset all mod_applied_* keys in UserDefaults so all apply toggles turn OFF
+        let dictionary = UserDefaults.standard.dictionaryRepresentation()
+        for key in dictionary.keys where key.hasPrefix("mod_applied_") {
+            UserDefaults.standard.set(false, forKey: key)
+        }
+        UserDefaults.standard.synchronize()
+
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+        }
+
         return restoredCount
     }
 

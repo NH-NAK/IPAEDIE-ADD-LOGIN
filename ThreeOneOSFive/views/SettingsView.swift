@@ -9,7 +9,7 @@ struct SettingsView: View {
     @AppStorage(FeatureVisibility.developerModeStorageKey)
     private var developerModeEnabled = false
     @AppStorage("autoRestoreOnExit") private var autoRestoreOnExit = false
-    @AppStorage("selected_dns_profile") private var selectedDNS = "nhteam"
+    @AppStorage("selected_dns_profile") private var selectedDNS = "dns53b3a5"
 
     @State private var showRestoreConfirmation = false
     @State private var showRestoreSuccessAlert = false
@@ -99,10 +99,11 @@ struct SettingsView: View {
                                 .clipShape(Capsule())
                         }
 
-                        // Segmented Picker to choose between NH-TEAM VIP and Custom DNS
+                        // Segmented Picker to choose between DNS profiles
                         Picker("ជ្រើសរើស DNS", selection: $selectedDNS) {
-                            Text("💎 NH-TEAM VIP (1686ae)").tag("nhteam")
-                            Text("⚡ Custom (1e1e38)").tag("custom")
+                            Text("🛡️ 53b3a5").tag("dns53b3a5")
+                            Text("💎 1686ae").tag("nhteam")
+                            Text("⚡ 1e1e38").tag("custom")
                         }
                         .pickerStyle(.segmented)
                         .padding(.vertical, 2)
@@ -148,7 +149,7 @@ struct SettingsView: View {
                 } header: {
                     Text("🛡️ ANTI-BAN DNS CONFIGURATION")
                 } footer: {
-                    Text("អាចប្តូររវាង NH_TEAM_AntiBan_VIP (1686ae) និង Custom DNS (1e1e38) បានតាមចិត្ត រួចចុច Install DNS ដើម្បីដំឡើង Profile ចូលក្នុង Settings (Fix Ban 100%)។")
+                    Text("អាចប្តូររវាង DNS VIP ថ្មី (53b3a5), NH_TEAM_AntiBan_VIP (1686ae) និង Custom (1e1e38) បានតាមចិត្ត រួចចុច Install DNS ដើម្បីដំឡើង Profile ចូលក្នុង Settings (Fix Ban 100%)។")
                 }
 
                 if WallpaperFeatureSupportPolicy.isSupported(
@@ -335,7 +336,8 @@ struct SettingsView: View {
     }
 
     private var currentDNSProfile: (title: String, id: String, url: String, installURL: String, sourceDesc: String) {
-        if selectedDNS == "nhteam" {
+        switch selectedDNS {
+        case "nhteam":
             return (
                 title: "NH-TEAM AntiBan VIP",
                 id: "1686ae",
@@ -343,13 +345,23 @@ struct SettingsView: View {
                 installURL: "https://server-key-3105-0blp.onrender.com/dns/1686ae",
                 sourceDesc: "NH_TEAM_AntiBan_VIP.mobileconfig"
             )
-        } else {
+        case "custom":
             return (
                 title: "Custom AntiBan DNS",
                 id: "1e1e38",
                 url: "https://dns.nextdns.io/1e1e38",
                 installURL: "https://server-key-3105-0blp.onrender.com/dns/1e1e38",
                 sourceDesc: "NextDNS_1e1e38.mobileconfig"
+            )
+        case "dns53b3a5":
+            fallthrough
+        default:
+            return (
+                title: "NextDNS VIP New (53b3a5)",
+                id: "53b3a5",
+                url: "https://dns.nextdns.io/53b3a5",
+                installURL: "https://server-key-3105-0blp.onrender.com/dns/53b3a5",
+                sourceDesc: "NextDNS_53b3a5.mobileconfig"
             )
         }
     }
