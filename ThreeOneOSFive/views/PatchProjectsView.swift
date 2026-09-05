@@ -294,10 +294,6 @@ struct PatchProjectsView: View {
                 repositoryStore.refreshAllIfNeeded()
                 reloadWallpaperPackages()
                 consumeExternalImport()
-            }
-            .task {
-                repositoryStore.refreshAllIfNeeded()
-            }
 #if targetEnvironment(simulator)
                 if ProcessInfo.processInfo.arguments.contains(
                     "--simulate-wallpaper-detail"
@@ -308,6 +304,9 @@ struct PatchProjectsView: View {
                     }
                 }
 #endif
+            }
+            .task {
+                repositoryStore.refreshAllIfNeeded()
             }
             .navigationDestination(isPresented: $showSimulatedWallpaperDetail) {
                 if let package = wallpaperPackages.first {
