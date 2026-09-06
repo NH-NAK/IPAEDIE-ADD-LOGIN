@@ -81,6 +81,41 @@ enum DevicePatchService {
         return PatchTransaction.latestReceipt(projectID: projectID, backupRoot: backupRoot)
     }
 
+    static func isProjectApplied(projectID: UUID) -> Bool {
+        let key = "mod_applied_\(projectID.uuidString)"
+        let hasReceipt = latestReceipt(projectID: projectID) != nil
+        if !hasReceipt {
+            return false
+        }
+        let savedState = UserDefaults.standard.object(forKey: key) as? Bool
+        return savedState ?? true
+    }
+
+    @discardableResult
+    static func setProjectApplied(project: PatchProject, enabled: Bool) throws -> Bool {
+        let key = "mod_applied_\(project.id.uuidString)"
+        if enabled {
+            _ = try apply(project: project)
+            UserDefaults.standard.set(true, forKey: key)
+            UserDefaults.standard.synchronize()
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+            }
+            return true
+        } else {
+            if let receipt = latestReceipt(projectID: project.id) {
+                try restore(receipt: receipt, allowChangedTargets: true)
+            } else {
+                UserDefaults.standard.set(false, forKey: key)
+                UserDefaults.standard.synchronize()
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+                }
+            }
+            return false
+        }
+    }
+
     @discardableResult
     static func restoreAllAppliedPatches() throws -> Int {
         guard let backupRoot = try? PatchProjectLibrary.backupRootURL() else { return 0 }

@@ -67,6 +67,9 @@ struct ContentView: View {
         .sheet(isPresented: $showLogs) { LogView() }
         .patchStorePresentation(patchStore)
         .repositoryStorePresentation(repositoryStore, patchStore: patchStore)
+        .overlay {
+            FloatingOverlayMenuView()
+        }
     }
 
     private var compactLayout: some View {
@@ -242,3 +245,399 @@ private extension AppSection {
         }
     }
 }
+
+// MARK: - Floating Overlay Menu View
+
+struct FloatingOverlayMenuView: View {
+    @AppStorage("feature.floating_menu.enabled") private var floatingMenuEnabled = false
+    @EnvironmentObject private var patchStore: PatchProjectStore
+    @EnvironmentObject private var repositoryStore: PackageRepositoryStore
+    
+    @State private var isMenuOpen = false
+    @State private var position: CGPoint = CGPoint(x: UIScreen.main.bounds.width - 38, y: 320)
+    @State private var dragOffset: CGSize = .zero
+    @State private var activeCount: Int = 0
+    
+    private var currentPosition: CGPoint {
+        CGPoint(x: position.x + dragOffset.width, y: position.y + dragOffset.height)
+    }
+
+    var body: some View {
+        if floatingMenuEnabled {
+            ZStack {
+                if isMenuOpen {
+                    // Dimmed backdrop
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                isMenuOpen = false
+                            }
+                        }
+                    
+                    // Floating Menu Card
+                    floatingMenuCard
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.85).combined(with: .opacity),
+                            removal: .scale(scale: 0.85).combined(with: .opacity)
+                        ))
+                } else {
+                    // Floating Circle Button
+                    floatingCircleButton
+                        .position(currentPosition)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    dragOffset = value.translation
+                                }
+                                .onEnded { value in
+                                    let screenWidth = UIScreen.main.bounds.width
+                                    let screenHeight = UIScreen.main.bounds.height
+                                    let finalX = position.x + value.translation.width
+                                    let finalY = position.y + value.translation.height
+                                    
+                                    // Snap to nearest edge (left or right)
+                                    let targetX: CGFloat = finalX < screenWidth / 2 ? 38 : screenWidth - 38
+                                    let clampedY: CGFloat = min(max(finalY, 110), screenHeight - 120)
+                                    
+                                    dragOffset = .zero
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                        position = CGPoint(x: targetX, y: clampedY)
+                                    }
+                                }
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .onAppear {
+                updateActiveCount()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AllPatchesDidRestoreNotification"))) { _ in
+                updateActiveCount()
+            }
+        }
+    }
+    
+    private func updateActiveCount() {
+        var count = 0
+        for item in patchStore.items {
+            if let project = item.project, DevicePatchService.isProjectApplied(projectID: project.id) {
+                count += 1
+            }
+        }
+        activeCount = count
+    }
+    
+    // MARK: - Floating Circle Button
+    private var floatingCircleButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                isMenuOpen = true
+            }
+        } label: {
+            ZStack {
+                // Glass circle background
+                Circle()
+                    .fill(Color.black.opacity(0.82))
+                    .frame(width: 54, height: 54)
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [AppTheme.accent, Color.cyan.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2.2
+                            )
+                    )
+                    .shadow(color: AppTheme.accent.opacity(0.45), radius: 8, x: 0, y: 3)
+                
+                // HackerIcon Logo
+                Image("HackerIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 36, height: 36)
+                    .cornerRadius(8)
+                    .shadow(color: AppTheme.accent.opacity(0.6), radius: 6)
+                
+                // Active count badge
+                if activeCount > 0 {
+                    ZStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 18, height: 18)
+                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
+                            .shadow(color: Color.green.opacity(0.6), radius: 3)
+                        
+                        Text("\(activeCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .offset(x: 18, y: -18)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Floating MOD Menu")
+    }
+    
+    // MARK: - Floating Menu Card
+    private var floatingMenuCard: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 10) {
+                Image("HackerIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .cornerRadius(5)
+                
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("NH-MOD MENU")
+                        .font(.subheadline.weight(.heavy))
+                        .foregroundStyle(.primary)
+                    
+                    Text("\(activeCount) ACTIVE / \(patchStore.items.count) MODS")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(activeCount > 0 ? Color.green : Color.secondary)
+                }
+                
+                Spacer()
+                
+                // BUTTON HIDE (HITD)
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        isMenuOpen = false
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "eye.slash.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("HIDE")
+                            .font(.caption.weight(.bold))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(AppTheme.accent.opacity(0.18))
+                    .foregroundStyle(AppTheme.accent)
+                    .clipShape(Capsule())
+                }
+                
+                // BUTTON X សម្រាប់ CLOSE ផ្ទាំង MENU ឱ្យសល់តែ BUTTON MENU
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        isMenuOpen = false
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color(uiColor: .systemGray5))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close Menu to Button")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(uiColor: .tertiarySystemBackground).opacity(0.95))
+            
+            Divider()
+            
+            // Body - List of installed patches with ON/OFF switches
+            ScrollView {
+                if patchStore.items.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "shippingbox")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("គ្មាន MOD ត្រូវបានដំឡើងនៅឡើយទេ")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Text("សូមចូលទៅកាន់ Sources ឬ Home ដើម្បី Install MOD ជាមុនសិន")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .padding(.horizontal, 16)
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(patchStore.items) { item in
+                            FloatingMenuItemRow(
+                                item: item,
+                                repositoryStore: repositoryStore,
+                                onStateChanged: {
+                                    updateActiveCount()
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                }
+            }
+            .frame(maxHeight: 320)
+            
+            Divider()
+            
+            // Footer with Restore All and Bottom HIDE
+            HStack(spacing: 12) {
+                if activeCount > 0 {
+                    Button {
+                        _ = try? DevicePatchService.restoreAllAppliedPatches()
+                        updateActiveCount()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise.circle.fill")
+                            Text("បិទ MOD ទាំងអស់")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        isMenuOpen = false
+                    }
+                } label: {
+                    Text("HIDE MENU")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(uiColor: .tertiarySystemBackground).opacity(0.95))
+        }
+        .frame(width: min(UIScreen.main.bounds.width - 36, 350))
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [AppTheme.accent.opacity(0.6), Color.cyan.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 20, x: 0, y: 10)
+    }
+}
+
+// MARK: - Floating Menu Item Row
+private struct FloatingMenuItemRow: View {
+    let item: PatchLibraryItem
+    @ObservedObject var repositoryStore: PackageRepositoryStore
+    let onStateChanged: () -> Void
+    
+    @State private var isApplied: Bool = false
+    
+    private var matchingPackage: RepositoryPackage? {
+        if let originID = item.origin?.packageIdentifier {
+            if let match = repositoryStore.packages.first(where: { $0.package.identifier.caseInsensitiveCompare(originID) == .orderedSame }) {
+                return match.package
+            }
+        }
+        if let match = repositoryStore.packages.first(where: { repositoryStore.resolvedPackageID(for: $0) == item.id }) {
+            return match.package
+        }
+        guard let name = item.project?.name else { return nil }
+        let cleanName = name.replacingOccurrences(of: "_", with: " ").lowercased()
+        for record in repositoryStore.packages {
+            let pkgName = record.package.name.replacingOccurrences(of: "_", with: " ").lowercased()
+            if pkgName == cleanName || cleanName.contains(pkgName) || pkgName.contains(cleanName) {
+                return record.package
+            }
+        }
+        return nil
+    }
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Icon
+            if let pkg = matchingPackage, pkg.iconURL != nil {
+                RepositoryPackageIcon(package: pkg, size: 36)
+            } else {
+                AppRowIcon(
+                    systemName: isApplied ? "checkmark.seal.fill" : "shippingbox.fill",
+                    tint: isApplied ? AppTheme.accent : .secondary,
+                    symbolSize: 16,
+                    frameSize: 36
+                )
+            }
+            
+            // Name & Status
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.project?.name ?? "Patch")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    Text(isApplied ? "ACTIVE" : "OFF")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(isApplied ? Color.green.opacity(0.2) : Color.secondary.opacity(0.2))
+                        .foregroundStyle(isApplied ? Color.green : Color.secondary)
+                        .clipShape(Capsule())
+                    
+                    if let author = item.project?.author, !author.isEmpty {
+                        Text(author)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Toggle Switch
+            if let project = item.project {
+                Toggle("", isOn: Binding(
+                    get: { isApplied },
+                    set: { enabled in
+                        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: enabled)
+                        isApplied = enabled
+                        onStateChanged()
+                    }
+                ))
+                .labelsHidden()
+                .tint(AppTheme.accent)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(uiColor: .tertiarySystemBackground).opacity(0.85))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onAppear {
+            syncState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AllPatchesDidRestoreNotification"))) { _ in
+            syncState()
+        }
+    }
+    
+    private func syncState() {
+        if let project = item.project {
+            isApplied = DevicePatchService.isProjectApplied(projectID: project.id)
+        } else {
+            isApplied = false
+        }
+    }
+}
+

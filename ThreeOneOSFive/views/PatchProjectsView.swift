@@ -19,6 +19,7 @@ struct PatchProjectsView: View {
     @EnvironmentObject private var store: PatchProjectStore
     @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
+    @AppStorage("feature.floating_menu.enabled") private var floatingMenuEnabled = false
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -109,18 +110,66 @@ struct PatchProjectsView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         if !filteredItems.isEmpty {
+                            Section {
+                                Toggle(isOn: $floatingMenuEnabled) {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(AppTheme.accent.opacity(0.12))
+                                                .frame(width: 36, height: 36)
+                                            Image("HackerIcon")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 24, height: 24)
+                                                .cornerRadius(5)
+                                        }
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Floating Menu (ម៉ឺនុយអណ្ដែតលើអេក្រង់)")
+                                                .font(.body.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                            Text("បើកប៊ូតុងរង្វង់អណ្ដែតលើទូរសព្ទ ដើម្បីបើក/បិទ MOD រហ័ស")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .tint(AppTheme.accent)
+                            }
+
                             Section(language.text("patch.title")) {
                                 ForEach(filteredItems) { item in
                                     itemRow(item)
                                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                             Button(role: .destructive) {
+                                                if let project = item.project {
+                                                    _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
+                                                }
                                                 store.delete(item)
                                             } label: {
                                                 Label(language.text("common.delete"), systemImage: "trash")
                                             }
                                         }
                                         .contextMenu {
+                                            if let project = item.project {
+                                                let isApplied = DevicePatchService.isProjectApplied(projectID: project.id)
+                                                if isApplied {
+                                                    Button {
+                                                        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
+                                                    } label: {
+                                                        Label("បិទទៅដើមវិញ (Restore Original)", systemImage: "arrow.counterclockwise")
+                                                    }
+                                                } else {
+                                                    Button {
+                                                        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: true)
+                                                    } label: {
+                                                        Label("បើកដំណើរការ (Apply MOD)", systemImage: "checkmark.seal.fill")
+                                                    }
+                                                }
+                                            }
                                             Button(role: .destructive) {
+                                                if let project = item.project {
+                                                    _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
+                                                }
                                                 store.delete(item)
                                             } label: {
                                                 Label(language.text("common.delete"), systemImage: "trash")
@@ -128,7 +177,13 @@ struct PatchProjectsView: View {
                                         }
                                 }
                                 .onDelete { offsets in
-                                    offsets.map { filteredItems[$0] }.forEach(store.delete)
+                                    for idx in offsets {
+                                        let item = filteredItems[idx]
+                                        if let project = item.project {
+                                            _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
+                                        }
+                                        store.delete(item)
+                                    }
                                 }
                             }
                         }
@@ -662,43 +717,12 @@ private struct PatchProjectRow: View {
             isAppliedState = false
             return
         }
-        let key = "mod_applied_\(project.id.uuidString)"
-        let hasReceipt = DevicePatchService.latestReceipt(projectID: project.id) != nil
-        if !hasReceipt {
-            UserDefaults.standard.set(false, forKey: key)
-            isAppliedState = false
-        } else {
-            let savedState = UserDefaults.standard.object(forKey: key) as? Bool
-            isAppliedState = savedState ?? true
-        }
+        isAppliedState = DevicePatchService.isProjectApplied(projectID: project.id)
     }
 
     private func toggleMod(project: PatchProject, enabled: Bool) {
-        let key = "mod_applied_\(project.id.uuidString)"
-        if enabled {
-            do {
-                _ = try DevicePatchService.apply(project: project)
-                UserDefaults.standard.set(true, forKey: key)
-                isAppliedState = true
-            } catch {
-                UserDefaults.standard.set(false, forKey: key)
-                isAppliedState = false
-            }
-        } else {
-            if let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
-                do {
-                    try DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
-                    UserDefaults.standard.set(false, forKey: key)
-                    isAppliedState = false
-                } catch {
-                    UserDefaults.standard.set(false, forKey: key)
-                    isAppliedState = false
-                }
-            } else {
-                UserDefaults.standard.set(false, forKey: key)
-                isAppliedState = false
-            }
-        }
+        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: enabled)
+        isAppliedState = DevicePatchService.isProjectApplied(projectID: project.id)
     }
 
     private var rowDetail: String {

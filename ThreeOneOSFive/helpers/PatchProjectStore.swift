@@ -283,11 +283,31 @@ final class PatchProjectStore: ObservableObject {
     }
 
     func delete(_ item: PatchLibraryItem) {
-        do {
-            if let project = item.project,
-               let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
-                try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+        let projectID = item.project?.id ?? item.id
+        
+        // Auto restore to original before deleting so mod never remains stuck in game!
+        if let project = item.project {
+            _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
+        } else if let receipt = DevicePatchService.latestReceipt(projectID: projectID) {
+            _ = try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+        }
+        
+        // Also ensure any applied receipts matching this project are restored
+        if let backupRoot = try? PatchProjectLibrary.backupRootURL() {
+            let allReceipts = PatchTransaction.allAppliedReceipts(backupRoot: backupRoot)
+            for receipt in allReceipts where receipt.projectID == projectID {
+                _ = try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
             }
+        }
+        
+        let modKey = "mod_applied_\(projectID.uuidString)"
+        UserDefaults.standard.set(false, forKey: modKey)
+        UserDefaults.standard.synchronize()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+        }
+
+        do {
             try PatchProjectLibrary.delete(item)
             reload()
         } catch let error as PatchPackageError {
