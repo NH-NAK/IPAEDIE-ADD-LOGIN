@@ -264,50 +264,62 @@ struct FloatingOverlayMenuView: View {
 
     var body: some View {
         if floatingMenuEnabled {
-            ZStack {
-                if isMenuOpen {
-                    // Dimmed backdrop
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                isMenuOpen = false
+            GeometryReader { proxy in
+                let screenSize = proxy.size
+                ZStack {
+                    if isMenuOpen {
+                        // Dimmed backdrop
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .transition(.opacity)
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    isMenuOpen = false
+                                }
                             }
-                        }
-                    
-                    // Floating Menu Card
-                    floatingMenuCard
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.85).combined(with: .opacity),
-                            removal: .scale(scale: 0.85).combined(with: .opacity)
-                        ))
-                } else {
-                    // Floating Circle Button
-                    floatingCircleButton
-                        .position(currentPosition)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    dragOffset = value.translation
-                                }
-                                .onEnded { value in
-                                    let screenWidth = UIScreen.main.bounds.width
-                                    let screenHeight = UIScreen.main.bounds.height
-                                    let finalX = position.x + value.translation.width
-                                    let finalY = position.y + value.translation.height
-                                    
-                                    // Snap to nearest edge (left or right)
-                                    let targetX: CGFloat = finalX < screenWidth / 2 ? 38 : screenWidth - 38
-                                    let clampedY: CGFloat = min(max(finalY, 110), screenHeight - 120)
-                                    
-                                    dragOffset = .zero
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                        position = CGPoint(x: targetX, y: clampedY)
+                        
+                        // Floating Menu Card
+                        floatingMenuCard(screenSize: screenSize)
+                            .position(x: screenSize.width / 2, y: screenSize.height / 2)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.85).combined(with: .opacity),
+                                removal: .scale(scale: 0.85).combined(with: .opacity)
+                            ))
+                    } else {
+                        // Floating Circle Button
+                        floatingCircleButton
+                            .position(currentPosition(screenSize: screenSize))
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        dragOffset = value.translation
                                     }
+                                    .onEnded { value in
+                                        let finalX = position.x + value.translation.width
+                                        let finalY = position.y + value.translation.height
+                                        
+                                        // Snap to nearest edge (left or right)
+                                        let targetX: CGFloat = finalX < screenSize.width / 2 ? 38 : screenSize.width - 38
+                                        let clampedY: CGFloat = min(max(finalY, 60), screenSize.height - 70)
+                                        
+                                        dragOffset = .zero
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                            position = CGPoint(x: targetX, y: clampedY)
+                                        }
+                                    }
+                            )
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    withAnimation {
+                                        floatingMenuEnabled = false
+                                        isMenuOpen = false
+                                    }
+                                } label: {
+                                    Label("បិទប៊ូតុងរង្វង់ចេញ (Turn Off Floating Button)", systemImage: "power")
                                 }
-                        )
-                        .transition(.scale.combined(with: .opacity))
+                            }
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
             }
             .onAppear {
@@ -317,6 +329,12 @@ struct FloatingOverlayMenuView: View {
                 updateActiveCount()
             }
         }
+    }
+
+    private func currentPosition(screenSize: CGSize) -> CGPoint {
+        let posX = min(max(position.x + dragOffset.width, 28), screenSize.width - 28)
+        let posY = min(max(position.y + dragOffset.height, 50), screenSize.height - 50)
+        return CGPoint(x: posX, y: posY)
     }
     
     private func updateActiveCount() {
@@ -384,8 +402,12 @@ struct FloatingOverlayMenuView: View {
     }
     
     // MARK: - Floating Menu Card
-    private var floatingMenuCard: some View {
-        VStack(spacing: 0) {
+    private func floatingMenuCard(screenSize: CGSize) -> some View {
+        let isLandscape = screenSize.width > screenSize.height
+        let cardWidth = min(screenSize.width - 32, isLandscape ? 480 : 350)
+        let listMaxHeight = isLandscape ? min(screenSize.height - 130, 220) : 320
+
+        return VStack(spacing: 0) {
             // Header
             HStack(spacing: 10) {
                 Image("HackerIcon")
@@ -442,6 +464,25 @@ struct FloatingOverlayMenuView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close Menu to Button")
+
+                // BUTTON POWER: បិទប៊ូតុងរង្វង់ចេញទាំងស្រុង
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        floatingMenuEnabled = false
+                        isMenuOpen = false
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red.opacity(0.15))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "power")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.red)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Turn Off Floating Button")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -483,11 +524,11 @@ struct FloatingOverlayMenuView: View {
                     .padding(.vertical, 10)
                 }
             }
-            .frame(maxHeight: 320)
+            .frame(maxHeight: listMaxHeight)
             
             Divider()
             
-            // Footer with Restore All and Bottom HIDE
+            // Footer with Restore All, Turn Off Button, and Bottom HIDE
             HStack(spacing: 12) {
                 if activeCount > 0 {
                     Button {
@@ -501,6 +542,20 @@ struct FloatingOverlayMenuView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.red)
                     }
+                }
+
+                Button {
+                    withAnimation {
+                        floatingMenuEnabled = false
+                        isMenuOpen = false
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "power")
+                        Text("បិទប៊ូតុងរង្វង់")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
@@ -519,7 +574,7 @@ struct FloatingOverlayMenuView: View {
             .padding(.vertical, 10)
             .background(Color(uiColor: .tertiarySystemBackground).opacity(0.95))
         }
-        .frame(width: min(UIScreen.main.bounds.width - 36, 350))
+        .frame(width: cardWidth)
         .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
