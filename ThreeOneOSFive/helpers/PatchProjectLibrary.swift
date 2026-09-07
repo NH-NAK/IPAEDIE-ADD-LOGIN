@@ -307,12 +307,21 @@ enum PatchProjectLibrary {
 
     static func delete(_ item: PatchLibraryItem, fileManager: FileManager = .default) throws {
         let backupRoot = try backupRootURL(fileManager: fileManager)
-        guard PatchTransaction.latestReceipt(
-            projectID: item.id,
-            backupRoot: backupRoot,
-            fileManager: fileManager
-        ) == nil else {
-            throw PatchPackageError.activePatchCannotBeDeleted
+        let targetIDs = [item.id, item.project?.id].compactMap { $0 }
+        for targetID in targetIDs {
+            if let receipt = PatchTransaction.latestReceipt(
+                projectID: targetID,
+                backupRoot: backupRoot,
+                fileManager: fileManager
+            ) {
+                _ = try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+            }
+        }
+        for targetID in targetIDs {
+            let projectDir = backupRoot.appendingPathComponent(targetID.uuidString, isDirectory: true)
+            if fileManager.fileExists(atPath: projectDir.path) {
+                try? fileManager.removeItem(at: projectDir)
+            }
         }
         if fileManager.fileExists(atPath: item.packageURL.path) {
             try fileManager.removeItem(at: item.packageURL)

@@ -637,22 +637,24 @@ private struct FloatingMenuItemRow: View {
             // Name & Status
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.project?.name ?? "Patch")
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 HStack(spacing: 4) {
                     Text(isApplied ? "ACTIVE" : "OFF")
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1.5)
+                        .font(.system(size: 8, weight: .bold))
+                        .padding(.horizontal, 4.5)
+                        .padding(.vertical, 1)
                         .background(isApplied ? Color.green.opacity(0.2) : Color.secondary.opacity(0.2))
                         .foregroundStyle(isApplied ? Color.green : Color.secondary)
                         .clipShape(Capsule())
                     
                     if let author = item.project?.author, !author.isEmpty {
                         Text(author)
-                            .font(.system(size: 10))
+                            .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }

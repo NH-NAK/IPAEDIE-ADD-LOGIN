@@ -19,7 +19,6 @@ struct PatchProjectsView: View {
     @EnvironmentObject private var store: PatchProjectStore
     @EnvironmentObject private var repositoryStore: PackageRepositoryStore
     @AppStorage(FeatureVisibility.cleanerStorageKey) private var cleanerEnabled = true
-    @AppStorage("feature.floating_menu.enabled") private var floatingMenuEnabled = false
     @State private var showCreate = false
     @State private var showImporter = false
     @State private var showWallpaperImporter = false
@@ -110,80 +109,26 @@ struct PatchProjectsView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         if !filteredItems.isEmpty {
-                            Section {
-                                Toggle(isOn: $floatingMenuEnabled) {
-                                    HStack(spacing: 12) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(AppTheme.accent.opacity(0.12))
-                                                .frame(width: 36, height: 36)
-                                            Image("HackerIcon")
-                                                .resizable()
-                                                .scaledToFit()
-                                                .frame(width: 24, height: 24)
-                                                .cornerRadius(5)
-                                        }
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Floating Menu (ម៉ឺនុយអណ្ដែតលើអេក្រង់)")
-                                                .font(.body.weight(.semibold))
-                                                .foregroundStyle(.primary)
-                                            Text("បើកប៊ូតុងរង្វង់អណ្ដែតលើទូរសព្ទ ដើម្បីបើក/បិទ MOD រហ័ស")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                                .tint(AppTheme.accent)
-                            }
-
                             Section(language.text("patch.title")) {
                                 ForEach(filteredItems) { item in
                                     itemRow(item)
                                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                             Button(role: .destructive) {
-                                                if let project = item.project {
-                                                    _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
-                                                }
-                                                store.delete(item)
+                                                deleteWithAutoRestore(item)
                                             } label: {
                                                 Label(language.text("common.delete"), systemImage: "trash")
                                             }
                                         }
                                         .contextMenu {
-                                            if let project = item.project {
-                                                let isApplied = DevicePatchService.isProjectApplied(projectID: project.id)
-                                                if isApplied {
-                                                    Button {
-                                                        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
-                                                    } label: {
-                                                        Label("បិទទៅដើមវិញ (Restore Original)", systemImage: "arrow.counterclockwise")
-                                                    }
-                                                } else {
-                                                    Button {
-                                                        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: true)
-                                                    } label: {
-                                                        Label("បើកដំណើរការ (Apply MOD)", systemImage: "checkmark.seal.fill")
-                                                    }
-                                                }
-                                            }
                                             Button(role: .destructive) {
-                                                if let project = item.project {
-                                                    _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
-                                                }
-                                                store.delete(item)
+                                                deleteWithAutoRestore(item)
                                             } label: {
                                                 Label(language.text("common.delete"), systemImage: "trash")
                                             }
                                         }
                                 }
                                 .onDelete { offsets in
-                                    for idx in offsets {
-                                        let item = filteredItems[idx]
-                                        if let project = item.project {
-                                            _ = try? DevicePatchService.setProjectApplied(project: project, enabled: false)
-                                        }
-                                        store.delete(item)
-                                    }
+                                    offsets.map { filteredItems[$0] }.forEach(deleteWithAutoRestore)
                                 }
                             }
                         }
@@ -399,14 +344,30 @@ struct PatchProjectsView: View {
         store.importPackage(from: request.source)
     }
 
+    private func deleteWithAutoRestore(_ item: PatchLibraryItem) {
+        let targetIDs = [item.id, item.project?.id].compactMap { $0 }
+        for targetID in targetIDs {
+            if let receipt = DevicePatchService.latestReceipt(projectID: targetID) {
+                _ = try? DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+            }
+            UserDefaults.standard.set(false, forKey: "mod_applied_\(targetID.uuidString)")
+        }
+        UserDefaults.standard.synchronize()
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("AllPatchesDidRestoreNotification"), object: nil)
+        }
+        store.delete(item)
+    }
+
     private func wallpaperRow(_ package: WallpaperStagedPackage) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             AppRowIcon(systemName: wallpaperSymbol)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(package.displayName)
-                    .font(.body.weight(.semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
                 InstalledContentKindBadge(kind: .wallpaper, language: language)
                 Text(language.text(
                     "wallpaper.package_summary",
@@ -416,11 +377,11 @@ struct PatchProjectsView: View {
                         countStyle: .file
                     )
                 ))
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 
     private var cleanerRow: some View {
@@ -646,24 +607,25 @@ private struct PatchProjectRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             if let pkg = matchingPackage, pkg.iconURL != nil {
-                RepositoryPackageIcon(package: pkg, size: 42)
+                RepositoryPackageIcon(package: pkg, size: 38)
             } else {
                 AppRowIcon(systemName: item.isLocked ? "lock.doc.fill" : (isAppliedState ? "checkmark.seal.fill" : "shippingbox.fill"))
                     .foregroundStyle(isAppliedState ? AppTheme.accent : .secondary)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .center, spacing: 6) {
                     Text(item.project?.name ?? language.text("patch.locked_project"))
-                        .font(.body.weight(.semibold))
+                        .font(.system(size: 13.5, weight: .semibold))
                         .foregroundStyle(.primary)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
                     if isAppliedState {
                         Text("ACTIVE")
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
+                            .font(.system(size: 8.5, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
                             .background(Color.green.opacity(0.2))
                             .foregroundStyle(Color.green)
                             .clipShape(Capsule())
@@ -672,12 +634,14 @@ private struct PatchProjectRow: View {
                 InstalledContentKindBadge(kind: .patch, language: language)
                 if let author = item.project?.author, !author.isEmpty {
                     Text(language.text("patch.by_author", author))
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 Text(rowDetail)
-                    .font(.caption)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             Spacer()
             if item.summary.isPasswordProtected {
@@ -703,7 +667,7 @@ private struct PatchProjectRow: View {
                 .tint(AppTheme.accent)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .onAppear {
             refreshState()
         }
@@ -717,12 +681,43 @@ private struct PatchProjectRow: View {
             isAppliedState = false
             return
         }
-        isAppliedState = DevicePatchService.isProjectApplied(projectID: project.id)
+        let key = "mod_applied_\(project.id.uuidString)"
+        let hasReceipt = DevicePatchService.latestReceipt(projectID: project.id) != nil
+        if !hasReceipt {
+            UserDefaults.standard.set(false, forKey: key)
+            isAppliedState = false
+        } else {
+            let savedState = UserDefaults.standard.object(forKey: key) as? Bool
+            isAppliedState = savedState ?? true
+        }
     }
 
     private func toggleMod(project: PatchProject, enabled: Bool) {
-        _ = try? DevicePatchService.setProjectApplied(project: project, enabled: enabled)
-        isAppliedState = DevicePatchService.isProjectApplied(projectID: project.id)
+        let key = "mod_applied_\(project.id.uuidString)"
+        if enabled {
+            do {
+                _ = try DevicePatchService.apply(project: project)
+                UserDefaults.standard.set(true, forKey: key)
+                isAppliedState = true
+            } catch {
+                UserDefaults.standard.set(false, forKey: key)
+                isAppliedState = false
+            }
+        } else {
+            if let receipt = DevicePatchService.latestReceipt(projectID: project.id) {
+                do {
+                    try DevicePatchService.restore(receipt: receipt, allowChangedTargets: true)
+                    UserDefaults.standard.set(false, forKey: key)
+                    isAppliedState = false
+                } catch {
+                    UserDefaults.standard.set(false, forKey: key)
+                    isAppliedState = false
+                }
+            } else {
+                UserDefaults.standard.set(false, forKey: key)
+                isAppliedState = false
+            }
+        }
     }
 
     private var rowDetail: String {
@@ -765,18 +760,19 @@ private struct InstalledContentKindBadge: View {
     let language: AppLanguage
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Image(systemName: kind.systemImage)
+                .font(.system(size: 9))
                 .accessibilityHidden(true)
             Text(language.text(kind.localizationKey))
+                .font(.system(size: 9.5, weight: .semibold))
         }
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(AppTheme.accent)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(AppTheme.accent.opacity(0.12), in: Capsule())
-            .fixedSize()
-            .accessibilityElement(children: .combine)
+        .foregroundStyle(AppTheme.accent)
+        .padding(.horizontal, 6)
+        .frame(height: 18)
+        .background(AppTheme.accent.opacity(0.12), in: Capsule())
+        .fixedSize()
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1139,6 +1135,9 @@ private struct PatchProjectDetailView: View {
 
     private func actionLabel(_ key: String, systemImage: String) -> some View {
         Label(language.text(key), systemImage: systemImage)
+            .font(.system(size: 14, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
