@@ -560,6 +560,12 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
+                    if let size = record.package.expectedSize, size > 0 {
+                        metadataBadge(
+                            ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file),
+                            systemImage: "internaldrive"
+                        )
+                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -573,6 +579,12 @@ struct RepositoryPackageDetailView: View {
                         record.package.version,
                         systemImage: "tag.fill"
                     )
+                    if let size = record.package.expectedSize, size > 0 {
+                        metadataBadge(
+                            ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file),
+                            systemImage: "internaldrive"
+                        )
+                    }
                     if record.package.isPrivate {
                         metadataBadge(
                             language.text("patch.private"),
@@ -662,6 +674,13 @@ struct RepositoryPackageDetailView: View {
                     label: language.text("repository.version"),
                     value: record.package.version
                 )
+                if let size = record.package.expectedSize, size > 0 {
+                    detailDivider()
+                    detailRow(
+                        label: language.text("patch.file_size"),
+                        value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+                    )
+                }
                 detailDivider()
                 detailRow(
                     label: language.text("repository.source"),
@@ -832,7 +851,7 @@ struct RepositoryPackageDetailView: View {
         } label: {
             Group {
                 if repositoryStore.isDownloading(record) {
-                    elapsedDownloadLabel
+                    downloadProgressView
                 } else if patchStore.isBusy {
                     ProgressView()
                         .controlSize(.small)
@@ -843,7 +862,7 @@ struct RepositoryPackageDetailView: View {
                     .font(.subheadline.weight(.semibold))
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 32)
+            .frame(maxWidth: .infinity, minHeight: 38)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.regular)
@@ -855,23 +874,48 @@ struct RepositoryPackageDetailView: View {
         .accessibilityHint(language.text("repository.install_footer"))
     }
 
-    private var elapsedDownloadLabel: some View {
-        let startedAt = repositoryStore.downloadStartedAt(for: record) ?? Date()
-        return TimelineView(.periodic(from: .now, by: 1)) { context in
+    private var downloadProgressView: some View {
+        let progress = repositoryStore.downloadProgress(for: record)
+        let percent = progress?.percent ?? 0
+        let fraction = progress?.fractionCompleted ?? 0.0
+        let bytesWritten = progress?.bytesWritten ?? 0
+        let totalExpected = (progress?.totalBytesExpected ?? 0) > 0
+            ? progress!.totalBytesExpected
+            : (record.package.expectedSize.map { Int64($0) } ?? 0)
+
+        return VStack(spacing: 6) {
             HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text(language.text(
-                    "repository.downloading_elapsed",
-                    RepositoryDownloadDurationFormatter.string(
-                        elapsedSeconds: context.date.timeIntervalSince(startedAt)
-                    )
-                ))
-                .font(.subheadline.weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(1)
+                if totalExpected > 0 {
+                    Text("\(percent)%")
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                    Spacer()
+                    Text("\(ByteCountFormatter.string(fromByteCount: bytesWritten, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: totalExpected, countStyle: .file))")
+                        .font(.caption.weight(.medium))
+                        .monospacedDigit()
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Downloading · \(ByteCountFormatter.string(fromByteCount: bytesWritten, countStyle: .file))")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                }
             }
+            .foregroundStyle(.white)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.3))
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: max(geo.size.width * CGFloat(totalExpected > 0 ? fraction : 0.05), 4))
+                }
+            }
+            .frame(height: 6)
         }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
     }
 
     private var installButtonTitleKey: String {
@@ -965,6 +1009,14 @@ struct RepositoryPackageRow: View {
                     ))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                    if let size = record.package.expectedSize, size > 0 {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file))
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

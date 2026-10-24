@@ -7,6 +7,25 @@ struct RepositoryStoreAlert: Identifiable {
     let messageKey: String
 }
 
+public struct PackageDownloadProgress: Equatable {
+    public let bytesWritten: Int64
+    public let totalBytesExpected: Int64
+
+    public var fractionCompleted: Double {
+        guard totalBytesExpected > 0 else { return 0 }
+        return min(max(Double(bytesWritten) / Double(totalBytesExpected), 0.0), 1.0)
+    }
+
+    public var percent: Int {
+        Int(fractionCompleted * 100)
+    }
+
+    public init(bytesWritten: Int64, totalBytesExpected: Int64) {
+        self.bytesWritten = bytesWritten
+        self.totalBytesExpected = totalBytesExpected
+    }
+}
+
 @MainActor
 final class PackageRepositoryStore: ObservableObject {
     @Published private(set) var sources: [RepositorySource]
@@ -14,6 +33,7 @@ final class PackageRepositoryStore: ObservableObject {
     @Published private(set) var sourceStates: [UUID: RepositorySourceState] = [:]
     @Published private(set) var downloadingPackageKeys = Set<String>()
     @Published private(set) var downloadStartedAtByPackageKey: [String: Date] = [:]
+    @Published private(set) var downloadProgressByPackageKey: [String: PackageDownloadProgress] = [:]
     @Published var alert: RepositoryStoreAlert?
     @Published private var catalogSyncOperations = 0
 
@@ -233,19 +253,34 @@ final class PackageRepositoryStore: ObservableObject {
         guard !downloadingPackageKeys.contains(record.id) else {
             return
         }
-        downloadStartedAtByPackageKey[record.id] = Date()
-        downloadingPackageKeys.insert(record.id)
+        let packageKey = record.id
+        let initialExpected = record.package.expectedSize.map { Int64($0) } ?? 0
+        downloadStartedAtByPackageKey[packageKey] = Date()
+        downloadingPackageKeys.insert(packageKey)
+        downloadProgressByPackageKey[packageKey] = PackageDownloadProgress(
+            bytesWritten: 0,
+            totalBytesExpected: initialExpected
+        )
 
         Task {
             defer {
-                downloadingPackageKeys.remove(record.id)
-                downloadStartedAtByPackageKey[record.id] = nil
+                downloadingPackageKeys.remove(packageKey)
+                downloadStartedAtByPackageKey[packageKey] = nil
+                downloadProgressByPackageKey[packageKey] = nil
             }
             do {
                 switch record.package.kind {
                 case .patch:
                     let data = try await PackageRepositoryNetworkClient.download(
-                        record.package
+                        record.package,
+                        onProgress: { [weak self] written, total in
+                            Task { @MainActor in
+                                self?.downloadProgressByPackageKey[packageKey] = PackageDownloadProgress(
+                                    bytesWritten: written,
+                                    totalBytesExpected: total
+                                )
+                            }
+                        }
                     )
                     let summary = try PatchPackageCodec.inspect(data)
                     resolutionIndex.record(
@@ -272,7 +307,17 @@ final class PackageRepositoryStore: ObservableObject {
                     )
                 case .wallpaper:
                     let packageURL = try await PackageRepositoryNetworkClient
-                        .downloadWallpaper(record.package)
+                        .downloadWallpaper(
+                            record.package,
+                            onProgress: { [weak self] written, total in
+                                Task { @MainActor in
+                                    self?.downloadProgressByPackageKey[packageKey] = PackageDownloadProgress(
+                                        bytesWritten: written,
+                                        totalBytesExpected: total
+                                    )
+                                }
+                            }
+                        )
                     defer { try? FileManager.default.removeItem(at: packageURL) }
                     try await Task.detached(priority: .userInitiated) {
                         _ = try WallpaperPackageStore.importPackage(
@@ -308,6 +353,10 @@ final class PackageRepositoryStore: ObservableObject {
 
     func downloadStartedAt(for record: RepositoryPackageRecord) -> Date? {
         downloadStartedAtByPackageKey[record.id]
+    }
+
+    func downloadProgress(for record: RepositoryPackageRecord) -> PackageDownloadProgress? {
+        downloadProgressByPackageKey[record.id]
     }
 
     func isInstalled(_ record: RepositoryPackageRecord) -> Bool {
@@ -485,7 +534,22 @@ final class PackageRepositoryStore: ObservableObject {
 #endif
 }
 
-private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskDelegate {
+private final class PackageDownloadSessionDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadDelegate {
+    private let onProgress: ((Int64, Int64) -> Void)?
+    private var continuation: CheckedContinuation<(URL, URLResponse), Error>?
+    private var didResume = false
+    private let lock = NSLock()
+
+    init(onProgress: ((Int64, Int64) -> Void)? = nil) {
+        self.onProgress = onProgress
+    }
+
+    func setContinuation(_ continuation: CheckedContinuation<(URL, URLResponse), Error>) {
+        lock.lock()
+        self.continuation = continuation
+        lock.unlock()
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -499,6 +563,60 @@ private final class PackageRepositoryRedirectDelegate: NSObject, URLSessionTaskD
             return
         }
         completionHandler(request)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        onProgress?(totalBytesWritten, totalBytesExpectedToWrite)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        let tempDestination = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: false)
+            .appendingPathExtension(location.pathExtension)
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return }
+        do {
+            try FileManager.default.moveItem(at: location, to: tempDestination)
+            if let response = downloadTask.response {
+                didResume = true
+                continuation?.resume(returning: (tempDestination, response))
+                continuation = nil
+            } else {
+                didResume = true
+                continuation?.resume(throwing: PackageRepositoryError.sourceUnavailable)
+                continuation = nil
+            }
+        } catch {
+            didResume = true
+            continuation?.resume(throwing: error)
+            continuation = nil
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !didResume else { return }
+        if let error = error {
+            didResume = true
+            continuation?.resume(throwing: error)
+            continuation = nil
+        }
     }
 }
 
@@ -526,28 +644,40 @@ enum PackageRepositoryNetworkClient {
         )
     }
 
-    static func download(_ package: RepositoryPackage) async throws -> Data {
+    static func download(
+        _ package: RepositoryPackage,
+        onProgress: ((Int64, Int64) -> Void)? = nil
+    ) async throws -> Data {
         guard package.kind == .patch else {
             throw PackageRepositoryError.invalidPackage
         }
-        let fileURL = try await verifiedDownload(package, maximumBytes: nil)
+        let fileURL = try await verifiedDownload(
+            package,
+            maximumBytes: nil,
+            onProgress: onProgress
+        )
         defer { try? FileManager.default.removeItem(at: fileURL) }
         return try Data(contentsOf: fileURL, options: .mappedIfSafe)
     }
 
-    static func downloadWallpaper(_ package: RepositoryPackage) async throws -> URL {
+    static func downloadWallpaper(
+        _ package: RepositoryPackage,
+        onProgress: ((Int64, Int64) -> Void)? = nil
+    ) async throws -> URL {
         guard package.kind == .wallpaper else {
             throw PackageRepositoryError.invalidPackage
         }
         return try await verifiedDownload(
             package,
-            maximumBytes: Int(WallpaperLabLimits.maximumArchiveBytes)
+            maximumBytes: Int(WallpaperLabLimits.maximumArchiveBytes),
+            onProgress: onProgress
         )
     }
 
     private static func verifiedDownload(
         _ package: RepositoryPackage,
-        maximumBytes: Int?
+        maximumBytes: Int?,
+        onProgress: ((Int64, Int64) -> Void)? = nil
     ) async throws -> URL {
         var downloadError: Error?
         
@@ -555,7 +685,9 @@ enum PackageRepositoryNetworkClient {
         do {
             let download = try await downloadFile(
                 from: package.downloadURL,
-                maximumBytes: maximumBytes
+                maximumBytes: maximumBytes,
+                expectedSize: package.expectedSize,
+                onProgress: onProgress
             )
             return try verifyDownloadedFile(download, package: package)
         } catch {
@@ -583,7 +715,9 @@ enum PackageRepositoryNetworkClient {
                     do {
                         let download = try await downloadFile(
                             from: fallbackURL,
-                            maximumBytes: maximumBytes
+                            maximumBytes: maximumBytes,
+                            expectedSize: package.expectedSize,
+                            onProgress: onProgress
                         )
                         return try verifyDownloadedFile(download, package: package)
                     } catch {
@@ -629,7 +763,9 @@ enum PackageRepositoryNetworkClient {
 
     private static func downloadFile(
         from rawURL: URL,
-        maximumBytes: Int?
+        maximumBytes: Int?,
+        expectedSize: UInt64? = nil,
+        onProgress: ((Int64, Int64) -> Void)? = nil
     ) async throws -> (fileURL: URL, finalURL: URL) {
         let validatedURL = try PackageRepositoryURLPolicy.validate(rawURL)
         
@@ -652,7 +788,10 @@ enum PackageRepositoryNetworkClient {
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 600
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        let delegate = PackageRepositoryRedirectDelegate()
+        let delegate = PackageDownloadSessionDelegate { written, expected in
+            let total = expected > 0 ? expected : (expectedSize.map { Int64($0) } ?? -1)
+            onProgress?(written, total)
+        }
         let session = URLSession(
             configuration: configuration,
             delegate: delegate,
@@ -662,16 +801,24 @@ enum PackageRepositoryNetworkClient {
 
         var request = URLRequest(url: url)
         request.setValue("3105", forHTTPHeaderField: "User-Agent")
-        let (temporaryURL, response) = try await session.download(for: request)
+        
+        let (temporaryURL, response): (URL, URLResponse) = try await withCheckedThrowingContinuation { continuation in
+            delegate.setContinuation(continuation)
+            let task = session.downloadTask(with: request)
+            task.resume()
+        }
+
         guard let response = response as? HTTPURLResponse,
               (200..<300).contains(response.statusCode),
               let finalURL = response.url,
               (try? PackageRepositoryURLPolicy.validate(finalURL)) != nil else {
+            try? FileManager.default.removeItem(at: temporaryURL)
             throw PackageRepositoryError.sourceUnavailable
         }
         if let maximumBytes {
             let values = try temporaryURL.resourceValues(forKeys: [.fileSizeKey])
             guard let byteCount = values.fileSize, byteCount <= maximumBytes else {
+                try? FileManager.default.removeItem(at: temporaryURL)
                 throw PackageRepositoryError.invalidManifest
             }
         }
@@ -683,6 +830,7 @@ enum PackageRepositoryNetworkClient {
             try FileManager.default.moveItem(at: temporaryURL, to: destination)
             return (destination, finalURL)
         } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
             throw PackageRepositoryError.sourceUnavailable
         }
     }
